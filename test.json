@@ -1,0 +1,16 @@
+    'contact_email': 'kjcland000@gmail.com',
+    'created_at': '2024-06-10T18:53:16-07:00',
+    'currency': 'USD',
+    'current_total_discounts': '50.00',
+    'current_total_price': '702.31',
+    'current_total_tax': '41.31',
+    'device_id': None,
+    'discount_codes': [
+      discount_code(None)
+    ],
+    'financial_status': 'partially_refunded',
+    'fulfillment_status': None,
+    'note': '客人要回KGCS20  20% 的折扣， 安排退142.2美金 --611uc\n10K黄金  美3.8  --611下单 \n已发订单邮件----6.11Cora',
+    'order_status_url': 'https://www.doveggs-seattle.com/8111390810/orders/86b662e16ee5142c7b23048bca468cae/authenticate?key=1fdf7e3a0cc99c9e564056d15b98b71b&none=VQVSB1NEUlhaR1ZE',
+    'phone': '+19493633358',
+    'presentment_currency': 'USD',
