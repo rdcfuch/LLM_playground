@@ -1,0 +1,26 @@
+install phidata duckdb exa_py yfinance nest_asyncio openai duckduckgo-search sqlalchemy pgvector psycopg pypdf
+export OPENAI_API_KEY=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
+export OPENAI_MODEL_NAME=gpt-4o
+
+
+#docker
+
+ docker run -d \
+  -e POSTGRES_DB=ai \
+  -e POSTGRES_USER=ai \
+  -e POSTGRES_PASSWORD=ai \
+  -e PGDATA=/var/lib/postgresql/data/pgdata \
+  -v pgvolume:/var/lib/postgresql/data \
+  -p 5532:5432 \
+  --name pgvector \
+  phidata/pgvector:16
+
+
+#LLM GUI
+git clone https://github.com/phidatahq/phidata
+
+
+#exa web search
+
+export EXA_API_KEY=c3dc018e-9e50-4d1b-86da-bb505c90cff9
+
