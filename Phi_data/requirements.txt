@@ -1,0 +1,14 @@
+phidata
+openai
+duckdb
+duckduckgo-search
+pydantic
+pandas
+wikipedia
+sqlalchemy
+pgvector
+pypdf
+psycopg
+arxiv
+yfinance
+ollama
