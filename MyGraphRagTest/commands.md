@@ -22,6 +22,11 @@ python3 -m graphrag.index --root ./ragtest
 python3 -m graphrag.query \
 --root ./ragtest \
 --method global \
+"Is property nearby superfund?"
+
+python3 -m graphrag.query \
+--root ./ragtest \
+--method global \
 "give me a brief of each crusade, each one summarized in 200 words."
 
 
