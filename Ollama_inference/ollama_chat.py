@@ -2,8 +2,8 @@ import openai
 from openai import OpenAI
 
 
-MODEL = "llama3.1:70b"
-MODEL_BASE_URL = 'http://127.0.0.1:11436/v1'  # use my server
+MODEL = "llama3.2"
+MODEL_BASE_URL = 'http://127.0.0.1:11434/v1'  # use my server
 API_KEY_SET = 'ollama'
 SYS_PROMT={"role": "system",
          "content": """

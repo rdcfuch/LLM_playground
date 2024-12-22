@@ -62,7 +62,7 @@ if __name__ == '__main__':
 Usage:
 1. Create an `index.html` file in the `templates` directory with the desired front page content.
 2. Run this script using Python to start the Flask server.
-3. Visit `http://localhost:6000/` in your browser to see the front page.
+3. Visit `http://localhost:8080/` in your browser to see the front page.
 4. Send POST requests to the `/chat` endpoint with JSON data like:
 
 {
