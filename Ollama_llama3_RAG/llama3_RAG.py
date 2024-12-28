@@ -24,9 +24,9 @@ import ollama
 
 input_urls = ["https://ollama.com/blog/llama-3-is-not-very-censored"]
 loader = SeleniumURLLoader(urls=input_urls)
-base_ollama_url= "http://127.0.0.1:11435/v1"
-embedding_ollama_url= "http://127.0.0.1:11435/api/embeddings"
-llm_model="llama3:70b"
+base_ollama_url= "http://127.0.0.1:11434/v1"
+embedding_ollama_url= "http://127.0.0.1:11434/api/embeddings"
+llm_model="llama3.2:latest"
 embedding_model="nomic-embed-text:latest"
 client = OpenAI(
     # base_url = 'http://192.168.1.199:11434/v1',

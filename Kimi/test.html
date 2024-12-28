@@ -1,0 +1,957 @@
+'<!DOCTYPE html>
+<html data-path="/p/:id">\n
+<body>\n
+<div id="app">
+    <div class="kr-article-box">
+        <div class="box-kr-article-new-y">
+            <div class="kr-layout">
+                <div></div>
+                <div class="kr-layout-main clearfloat">
+                    <div class="kr-header " style="opacity: 1; transform: translateY(0px);">
+                        <div class="kr-header-main ">
+                            <div class="kr-header-content">
+                                <div class="user-login" style="display: none;"><img alt="" class="user-pic">
+                                    <div class="pull-down"><a class="ellipsis-1 user-name" title=""
+                                                              href="/usercenter/basicinfo" target="_blank"
+                                                              rel="noopener noreferrer"></a><a class="ellipsis-1 "
+                                                                                               title="账号设置"
+                                                                                               href="/usercenter/account-password"
+                                                                                               target="_blank"
+                                                                                               rel="noopener noreferrer">账号设置</a><a
+                                            class="ellipsis-1 " title="我的关注" href="/usercenter/follow"
+                                            target="_blank" rel="noopener noreferrer">我的关注</a><a class="ellipsis-1 "
+                                                                                                     title="我的收藏"
+                                                                                                     href="/usercenter/favorite"
+                                                                                                     target="_blank"
+                                                                                                     rel="noopener noreferrer">我的收藏</a><a
+                                            class="ellipsis-1 " title="申请的报道" href="/seek-report-new?tabKey=2"
+                                            target="_blank" rel="noopener noreferrer">申请的报道</a><a
+                                            class="ellipsis-1 " title="退出登录" target="_blank"
+                                            rel="noopener noreferrer">退出登录</a></div>
+                                </div>
+                                <div class="user-login" style="display: inline-block;">
+                                    <div class="text">登录</div>
+                                </div>
+                                <div class="kr-header-search-entry clearfloat">
+                                    <div class="search-button"><span class="search-icon"></span><span
+                                            class="search-text weight-bold">搜索</span></div>
+                                </div>
+                                <div>
+                                    <ul class="business-nav">
+                                        <li class="nav-wrapper nav-wrapper-two-col">
+                                            <div class="sub-nav-wrapper"
+                                                 style="transform: scaleY(0.125); transition-duration: 0.666667s;">
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_384be8e4c1e942a28cf13a2e427fe211@18900718_oswg78404oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪Auto</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_636063907bdc44389b46e7db9c761a38@18900718_oswg62424oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>数字时氪</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230210/v2_38d1cdabc8404b00806de58cbedb3b7b_oswg27031oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>未来消费</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_da74c43ba887426f8fbccaede691b844@18900718_oswg76573oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>智能涌现</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_8c2233c88a854c6496ff4f7842a9f9dd_oswg17629oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>未来城市</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_632f36f1c5904a539a1e57efe4497e3a@18900718_oswg63630oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>启动Power on</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="http://letschuhai.com"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪出海</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_89fa42090fae495ca5e45ba921ee42ff@18900718_oswg65306oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪研究院</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20231204/v2_3b8447ffdda24a38a30fd839fd934baa@000000_oswg40121oswg430oswg430_img_jpeg"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>潮生TIDE</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_c4720503500642d294b5be04064ef870@18900718_oswg58529oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪企服点评</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_d6d3f8b57fa04507915c48adf0f9620d_oswg16586oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪财经</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_efc94b0cce7043dbac883c1dfe00c810@18900718_oswg57046oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>职场bonus</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_9eb02027be264174b61b9d49c391ca75_oswg15571oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36碳</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230605/v2_86f220b69e164751946d583b5472c857@18900718_oswg97988oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>后浪研究所</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_0c6a697748b54beea356d6e1f1fcec5f_oswg17066oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>暗涌Waves</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_2f845ed16244458d8887a5526c63c6d6_oswg17346oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>硬氪</span></a>
+                                                </div>
+                                            </div>
+                                            <div class="nav-label "><span>媒体品牌</span></div>
+                                        </li>
+                                        <li class="nav-wrapper ">
+                                            <div class="sub-nav-wrapper"
+                                                 style="transform: scaleY(0.25); transition-duration: 0.333333s;">
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://q.36kr.com" target="_blank"
+                                                                             rel="noopener noreferrer"><span>企业号</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://www.36dianping.com/"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>企服点评</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/academe"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36Kr研究院</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://innovation.36kr.com"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36Kr创新咨询</span></a>
+                                                </div>
+                                            </div>
+                                            <div class="nav-label "><span>企业服务</span></div>
+                                        </li>
+                                        <li class="nav-wrapper ">
+                                            <div class="sub-nav-wrapper"
+                                                 style="transform: scaleY(0.5); transition-duration: 0.166667s;">
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://www.36kr.com/p/2492318105786505"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>核心服务</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/policy"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>城市之窗</span></a>
+                                                </div>
+                                            </div>
+                                            <div class="nav-label "><span>政府服务</span></div>
+                                        </li>
+                                        <li class="nav-wrapper ">
+                                            <div class="sub-nav-wrapper"
+                                                 style="transform: scaleY(0.166667); transition-duration: 0.5s;">
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://topics.36kr.com/topic/1645523444931974"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>创投发布</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/LPlan"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>LP源计划</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/VClub"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>VClub</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/organization/"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>VClub投资机构库</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/topics/1620276089894403"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>投资机构职位推介</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://pitchhub.36kr.com/audit-investor"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>投资人认证</span></a>
+                                                </div>
+                                            </div>
+                                            <div class="nav-label "><span>投资人服务</span></div>
+                                        </li>
+                                        <li class="nav-wrapper ">
+                                            <div class="sub-nav-wrapper"
+                                                 style="transform: scaleY(0.25); transition-duration: 0.333333s;">
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/seek-report-new"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>寻求报道</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://img.36krcdn.com/hsossms/20230209/v2_95565530d4d94dc4ad904f3131c7b690_oswg23055oswg320oswg320_img_png"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>36氪Pro</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://topics.36kr.com/topic/1961250130199045"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>创投氪堂</span></a>
+                                                </div>
+                                                <div class="sub-nav-item"><a class="sub-nav-name "
+                                                                             href="https://36kr.com/project-form/settled"
+                                                                             target="_blank"
+                                                                             rel="noopener noreferrer"><span>企业入驻</span></a>
+                                                </div>
+                                            </div>
+                                            <div class="nav-label "><span>创业者服务</span></div>
+                                        </li>
+                                        <li class="nav-wrapper ">
+                                            <div class="sub-nav-wrapper" style="transition-duration: 0s;"></div>
+                                            <div class="nav-label "><span>创投平台</span></div>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="wise-entry-box">
+                                    <div class="wise-entry-box-box"><a href="https://36kr.com/topics/799051634713857"
+                                                                       class="wise-entry-one" target="_blank"
+                                                                       rel="noopener noreferrer"> </a><a
+                                            href="http://www.bjjubao.org.cn/node_1606.html" class="wise-entry-two"
+                                            target="_blank" rel="noopener noreferrer"> </a><a
+                                            href="ttps://36kr.com/topics/799051634713857" class="wise-entry-three"
+                                            target="_blank" rel="noopener noreferrer"> </a></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="main-left">
+                        <div class="kr-sider-wrapper fixed "
+                             style="transform: translate(0px, 0px) translateZ(0px); top: 44px;">
+                            <div class="kr-sider "><a href="/" class="go-home clearfloat">
+                                <div class="logo"></div>
+                            </a>
+                                <div class="kr-sider-shadow-wrapper clearfloat">
+                                    <div class="line"></div>
+                                    <ul class="kr-channel-nav">
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/"
+                                                                      id="home">首页</a></div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/newsflashes/"
+                                                                      id="newsflash">快讯</a></div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><span class="open-icon close"></span><a
+                                                    class="name weight-bold " href="/information/web_news/"
+                                                    id="information">资讯</a></div>
+                                            <div class="sub-list ">
+                                                <ul class="sub-list-right">
+                                                    <li class="sub-item"><a href="/information/web_recommend/" class="">推荐</a>
+                                                    </li>
+                                                    <li class="sub-item"><a href="/information/ccs/" class="">财经</a>
+                                                    </li>
+                                                    <li class="sub-item"><a href="/information/AI/" class="">AI</a></li>
+                                                    <li class="sub-item"><a href="/information/aireport/"
+                                                                            class="">自助报道</a></li>
+                                                    <li class="sub-item"><a class="">城市</a></li>
+                                                </ul>
+                                                <ul class="sub-list-left">
+                                                    <li class="sub-item"><a href="/information/web_news/latest/"
+                                                                            class="">最新</a></li>
+                                                    <li class="sub-item"><a href="/information/contact/"
+                                                                            class="">创投</a></li>
+                                                    <li class="sub-item"><a href="/information/travel/"
+                                                                            class="">汽车</a></li>
+                                                    <li class="sub-item"><a href="/information/technology/"
+                                                                            class="">科技</a></li>
+                                                    <li class="sub-item"><a href="/information/shuzihua/"
+                                                                            class="">专精特新</a></li>
+                                                </ul>
+                                            </div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/live/channel"
+                                                                      id="liveChannel">直播</a></div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/video/"
+                                                                      id="video">视频</a></div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/topics/"
+                                                                      id="special-topic">专题</a></div>
+                                        </li>
+                                        <li class="channel-item">
+                                            <div class="sub-title"><a class="name weight-bold " href="/activity"
+                                                                      id="activity">活动</a></div>
+                                        </li>
+                                        <div class="local-list" style="display: none;"><span class="triangle"></span>
+                                            <div class="local-column">
+                                                <li class="local-item"><a href="/local/guangdong" class="">广东</a></li>
+                                                <li class="local-item"><a href="/local/jiangsu" class="">江苏</a></li>
+                                                <li class="local-item"><a href="/local/sichuan" class="">四川</a></li>
+                                                <li class="local-item"><a href="/local/henan" class="">河南</a></li>
+                                                <li class="local-item"><a href="/local/hubei" class="">湖北</a></li>
+                                                <li class="local-item"><a href="/local/anhui" class="">安徽</a></li>
+                                                <li class="local-item"><a href="/local/hainan" class="">海南</a></li>
+                                            </div>
+                                            <div class="local-column">
+                                                <li class="local-item"><a href="/local/zhejiang" class="">浙江</a></li>
+                                                <li class="local-item"><a href="/local/xian" class="">陕西</a></li>
+                                                <li class="local-item"><a href="/local/chongqing" class="">重庆</a></li>
+                                                <li class="local-item"><a href="/local/qingdao" class="">山东</a></li>
+                                                <li class="local-item"><a href="/local/hunan" class="">湖南</a></li>
+                                                <li class="local-item"><a href="/local/guizhou" class="">贵州</a></li>
+                                            </div>
+                                        </div>
+                                    </ul>
+                                    <div class="kr-search-entry clearfloat">
+                                        <div class="search-button"><span class="search-icon"></span><span
+                                                class="search-text weight-bold">搜索</span></div>
+                                    </div>
+                                    <div class="seek-report-wrap"><span class="hot-icon"></span><a
+                                            href="/seek-report-new?t=1735331169626" class="seek-report" target="_blank"
+                                            rel="noopener noreferrer nofollow"><span
+                                            class="seek-report-icon"></span><span
+                                            class="seek-report-text">寻求报道</span></a></div>
+                                    <div>
+                                        <div class="i-want-contribution"><span
+                                                class="i-want-contribution-icon"></span><span
+                                                class="i-want-contribution-text">我要入驻</span></div>
+                                    </div>
+                                    <a href="/station-business" class="station-business" target="_blank"
+                                       rel="noopener noreferrer nofollow"><span
+                                            class="station-business-icon"></span><span class="station-business-text">城市合作</span></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="main-right ">
+                        <div class="kr-layout-content">
+                            <div class="kr-article">
+                                <div class="kr-article-inner">
+                                    <div class="article-detail-wrapper-box">
+                                        <div>
+                                            <div class="article-left-container">
+                                                <div class="article-content">
+                                                    <div class="article-mian-content">
+                                                        <div class="article-wrapper common-width">
+                                                            <div class="common-width">
+                                                                <div><h1
+                                                                        class="article-title margin-bottom-20 common-width">
+                                                                    豆包定价一元的野心：字节跳动打响AI突围战</h1>
+                                                                    <div class="article-title-icon common-width margin-bottom-40">
+                                                                        <a class="title-icon-item item-a"
+                                                                           href="/user/5569193" target="_blank"
+                                                                           rel="nofollow noopener noreferrer">投资者网</a><span
+                                                                            class="title-icon-item item-time"><i>·</i>2024年12月26日 21:40</span>
+                                                                    </div>
+                                                                    <div class="summary">AI赛道的搅局者。</div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="common-width margin-bottom-20">
+                                                                <div class="common-width content articleDetailContent kr-rich-text-wrapper">
+                                                                    \n \n \n <p>"一元钱能做什么？"&nbsp;</p>\n <p>
+                                                                    在人工智能快速发展的当下，这个问题有了新的答案——处理284张720P的图片。2023年12月，随着字节跳动发布最新的豆包视觉理解模型，AI领域又迎来一次"降维打击"：每千tokens的输入价格降至3厘，较行业常见价格低了整整85%。&nbsp;</p>
+                                                                    \n <p>
+                                                                    技术创新往往如蝴蝶效应，能在市场上掀起阵阵涟漪。豆包的这次更新带来了视觉模型的重大突破，更是掀开了一系列技术革新：通用模型Pro宣称已全面对齐GPT-4，定价却仅为后者八分之一；音乐模型实现从60秒片段到3分钟完整作品的跨越；而文生图模型2.1版本在业界率先将汉字生成和一句话P图推向产品化。&nbsp;</p>
+                                                                    \n
+                                                                    <blockquote>\n <p>
+                                                                        数据显示。截至12月中旬的统计显示，豆包通用模型的日均tokens使用量已突破4万亿大关，较首发时期激增33倍。这一成绩单立即在资本市场引发震动，多只"豆包概念股"应声而涨。&nbsp;</p>
+                                                                        \n
+                                                                    </blockquote>
+                                                                    \n <p>
+                                                                    然而，商业世界从来不乏理性的声音。12月19日，字节跳动发布公告，直指市场上出现的"豆包概念股"炒作现象，明确指出相关传言存在夸大和虚构成分，涉及资本开支、数据中心、AI硬件等多个层面，并呼吁投资者保持清醒，防范投资风险。&nbsp;</p>
+                                                                    \n <p>
+                                                                    在这轮声势浩大的技术革新与市场反应中，豆包究竟代表着什么？它为何能在中国AI市场掀起如此大的波澜？&nbsp;</p>
+                                                                    \n <h2><strong>01 争夺AI赛道</strong></h2>\n <p>
+                                                                    无疑，豆包正在上演一场全方位的"进击"。&nbsp;</p>\n <p>
+                                                                    当前，字节跳动采取了"多点开花"的布局策略，目前运营的AI应用已扩展至约20款，构建起一个覆盖多个领域的产品矩阵。值得注意的是，这些应用大多在2024年陆续推出，显示出字节在AI领域布局的提速。</p>
+                                                                    \n <p>
+                                                                    随着2024年下半年大模型应用市场的竞争加剧，一场围绕用户与价格的角力逐渐成型。正如开篇所述的豆包采取的价格攻势，正是这场行业内卷的缩影。</p>
+                                                                    \n <p>
+                                                                    在当前市场环境下，无论是创业公司还是互联网巨头，都不得不重新思考自己的竞争策略。B端市场的价格体系正在经历新一轮调整，而C端市场则演变为一场全面的用户争夺战。</p>
+                                                                    \n <p>
+                                                                    与此同时，C端市场的用户争夺也在不断升温。据AppGrowing统计，截至11月15日，国内十款AI原生应用的营销投入总额达15亿元，其中仅10月一个月就投入超过3.5亿元。在这场营销战中，Kimi和豆包分别投入5.4亿元和4亿元，成为投放最为密集的两个产品。</p>
+                                                                    \n <p>
+                                                                    具体观察豆包的营销节奏可以发现，其投放力度呈现明显的递进态势。数据显示，2024年4-5月期间，豆包的广告投放在1500万元至1750万元区间。到6月上旬，单次营销活动的投入就达到1.24亿元。除了常规的市场投放外，豆包还借助抖音这一重要流量池，在平台内占据了AI应用广告的主要位置。</p>
+                                                                    \n <p>
+                                                                    这种高强度的市场投入产生了显著的数据变化。量子位智库的统计显示，截至11月底，豆包在2024年积累了超过1.6亿用户，日活跃用户达到近900万，在全球AI助手排名中仅次于ChatGPT。</p>
+                                                                    \n <p>从应用商店表现来看，豆包自5月上线以来持续占据App
+                                                                    Store免费榜前列，6月份更是保持了一个月的榜首位置。这种快速增长的态势，也在改变着内容平台的广告格局，比如在B站，原本频繁出现的Kimi广告逐渐淡出，取而代之的是豆包的密集投放。</p>
+                                                                    \n <p>
+                                                                    不过，在这轮快速扩张之后，如何保持增长势头，如何实现可持续发展，将是豆包面临的新课题。</p>
+                                                                    \n <h2><strong>02 字节跳动的AI野心</strong></h2>\n
+                                                                    <p>
+                                                                        "最大的危机感，是担心字节跳动作为一个组织，正在变得平庸，无法取得新的突破"，2023年1月30日，字节跳动CEO梁汝波在年度全员会上的这番反思，折射出一家互联网巨头在AI浪潮下的深层思考。&nbsp;</p>
+                                                                    \n <p>
+                                                                    事实上，这种危机感并非空穴来风。回望2018至2021年，中国互联网行业经历了一轮AI人才出走潮。吴恩达、张潼、贾佳亚、金榕等AI
+                                                                    Lab负责人和科学家纷纷选择回归学界或投身创业。与此同时，全球AI领域正在孕育变革：OpenAI已推进至GPT-3，展示出令人瞩目的对话、下棋、文字生成等能力；谷歌发布BERT模型和Transformer架构，为未来的Scaling
+                                                                    law奠定基础。&nbsp;</p>\n <p>
+                                                                    尽管国内各大科技公司也在积极布局——字节跳动开发了数十亿参数模型，百度推出ERNIE，阿里发布M6和Plug，华为推出盘古模型，但据相关报道，当时的研发重点仍局限于特定任务，对大语言模型的商业化前景普遍持观望态度。&nbsp;</p>
+                                                                    \n <p>
+                                                                    直到2022年11月30日，ChatGPT的横空出世彻底改变了这一切。ChatGPT的成功无疑打乱了行业的节奏。字节跳动在2023年初开始布局GPT后，展开了一场令人惊叹的"追赶竞赛"：2月，组建"Seed"团队，从TikTok调回产品技术负责人朱文佳主导AI攻坚；6月，推出"火山方舟"平台，为如月之暗面、智谱AI、MiniMax等新锐企业提供模型训练支持；8月，云雀大模型入选首批国家备案名单，同时AI助手"豆包"正式亮相；11月，成立Flow部门，由产品与战略副总裁朱骏、技术副总裁洪定坤分别执掌产品与工程。&nbsp;</p>
+                                                                    \n <p>
+                                                                    在这场AI角逐中，人才争夺战愈发激烈。字节跳动不仅成功招揽了原阿里通义千问大模型技术负责人周畅、零一万物原预训练负责人黄文灏、Google原VideoPoet项目负责人蒋路等业界重量级人物，更是在内部进行了大刀阔斧的调整——抖音集团CEO张楠、飞书产品负责人齐俊元等核心管理者纷纷转入AI阵营。&nbsp;</p>
+                                                                    \n <p>
+                                                                    如今，Flow已然成长为与抖音、火山、飞书比肩的战略级业务，通过AI产品团队Flow、大模型研发团队Seed和产品研发支持团队Stone的协同布局，构建起完整的AI生态体系。&nbsp;</p>
+                                                                    \n <p>
+                                                                    无疑，全球AI版图正在加速重构。OpenAI年末连续12场新品发布会的进取姿态，以及对2025年"超人工智能"雏形的大胆预测，都在提醒着这场技术内卷远未结束。&nbsp;</p>
+                                                                    \n <p>
+                                                                    从互联网萌芽到移动时代，从BAT鼎立到新兴力量崛起，中国科技产业的发展历程告诉我们：唯有与时俱进，方能立于不败之地。对于字节跳动而言，豆包的市场表现或许只是一个开始，如何在全球AI竞技场上为中国科技企业赢得更多话语权，才是其面临的真正考验。&nbsp;</p>
+                                                                    \n <p>
+                                                                    历史已经证明，每一次技术变革都会重塑行业格局，而能够洞察变革、拥抱变革的企业，才能够在新时代中开辟属于自己的赛道。</p>
+                                                                    \n <p class="editor-note">本文来自微信公众号<a
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer nofollow"
+                                                                        href="https://mp.weixin.qq.com/s/jKTDfa6AQ8xHAb5h29al9g">“投资者网”</a>，作者：王健凡，36氪经授权发布。
+                                                                </p>\n \n
+                                                                </div>
+                                                            </div>
+                                                            <div class="common-width">
+                                                                <div class="article-footer-txt"><p>
+                                                                    该文观点仅代表作者本人，36氪平台仅提供信息存储空间服务。</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="ad87-box"></div>
+                                                <div class="thumb-up-box">
+                                                    <div class="thumb-inner">
+                                                        <div class="thumb-wrapper">
+                                                            <div class="backgroundImg-box-wrapper">
+                                                                <div class="backgroundImg-box showNormal"><span
+                                                                        class="kr-article-tranistion-thumb  normalColor">+1</span>
+                                                                    <div class="thumbNum normalColor">90</div>
+                                                                </div>
+                                                            </div>
+                                                            <p class="txt">好文章，需要你的鼓励</p></div>
+                                                    </div>
+                                                </div>
+                                                <div class="navbar-wrapper">
+                                                    <div class="navbar-inner-box" style="transition: transform 500ms;">
+                                                        <div class="kr-card">
+                                                            <div class="top-line" style="height: 4px;"></div>
+                                                            <div class="kr-card-content article-detail-navbar">
+                                                                <div class="wrapper" style="width: 100%; height: 70px;">
+                                                                    <div class="inner"><a class="author-avrtar"
+                                                                                          href="/user/5569193"
+                                                                                          target="_blank"
+                                                                                          rel="noopener noreferrer">
+                                                                        <div class="kr-avatar author-avatar-img"
+                                                                             style="background-image: url(&quot;https://tvax4.sinaimg.cn/crop.14.10.427.427.50/5309085bly8gexk0133moj20ch0cet8r.jpg&quot;);">
+                                                                            <i class="kr-avatar-v "
+                                                                               style="width: 14px; height: 14px; background-image: url(&quot;//static.36krcdn.com/36kr-web/static/ic_authentication_currency@3x.ad22d0c4.png&quot;);"></i>
+                                                                        </div>
+                                                                    </a><a class="author-name" href="/user/5569193"
+                                                                           target="_blank" rel="noopener noreferrer">投资者网</a><span
+                                                                            class="author-level">特邀作者</span>
+                                                                        <div class="actions-Items">
+                                                                            <div class="items-inner">
+                                                                                <div class="item item1"><span
+                                                                                        class="item-collection-action item-common"><b
+                                                                                        class="favorite-count item-count-common">38</b><i
+                                                                                        class="collect-icon item-icon">收&nbsp;&nbsp;藏</i><span
+                                                                                        class="count-animation-collect ">+1</span><span
+                                                                                        class=""></span></span><span
+                                                                                        class="item-tocomment-action item-common "><b
+                                                                                        class="comment-count item-count-common">2</b><i
+                                                                                        class="tocomment-icon item-icon">评&nbsp;&nbsp;论</i></span>
+                                                                                </div>
+                                                                                <div class="item item2"><span
+                                                                                        class="item-share-weixin item-common"><span
+                                                                                        class="weixin-icon item-icon"><img
+                                                                                        class="weixin-code"
+                                                                                        src="https://gateway.36kr.com/api/mis/sns/share/qrCodeUrl?partner_id=web&amp;param.siteId=1&amp;param.platformId=2&amp;param.url=https://36kr.com/p/3096460520623624"
+                                                                                        alt="36氪"><i
+                                                                                        class="weixin-txt">打开微信“扫一扫”，打开网页后点击屏幕右上角分享按钮</i></span></span><a
+                                                                                        class="item-share-weibo item-common"
+                                                                                        href="https://service.weibo.com/share/share.php?appkey=595885820&amp;url=https://36kr.com/p/3096460520623624&amp;title=豆包定价一元的野心：字节跳动打响AI突围战"
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer nofollow"><i
+                                                                                        class="weibo-icon item-icon">微&nbsp;&nbsp;博</i></a>
+                                                                                </div>
+                                                                                <div class="item item3"><span
+                                                                                        class="item-pure-action item-common"><i
+                                                                                        class="pure-icon item-icon">沉浸阅读</i></span><span
+                                                                                        class="item-backtop-action item-common"><i
+                                                                                        class="totop-icon item-icon">返回顶部</i></span>
+                                                                                </div>
+                                                                                <div class="item item4"><span
+                                                                                        class="item-report">举报</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div></div>
+                                                <div class="kr-article-commitbox-left-navbar-bottom">
+                                                    <div class="kr-plugin-comment " title="参与评论">
+                                                        <div class="comment-part">
+                                                            <div class="comment-part-title">
+                                                                <div class="kr-column-title"><span
+                                                                        class="kr-column-title-icon"></span><span
+                                                                        class="kr-column-title-text weight-bold">参与评论</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="comment-input-content">
+                                                                <div class="comment-input-wrapper">
+                                                                    <div class="comment-input-nologin">
+                                                                        评论千万条，友善第一条
+                                                                    </div>
+                                                                </div>
+                                                                <div class="comment-control">
+                                                                    <div class="comment-control-nologin"><a
+                                                                            class="login-link">登录</a>后参与讨论
+                                                                    </div>
+                                                                    <span class="comment-control-submit"><span>提交评论</span></span><span
+                                                                        class="length-tip">0/1000</span></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="ad817-box"></div>
+                                                <div class="relate-articles">
+                                                    <div class="relate-articles-inner-wrapper">
+                                                        <div class="kr-column-title"><span
+                                                                class="kr-column-title-icon"></span><span
+                                                                class="kr-column-title-text weight-bold">你可能也喜欢这些文章</span>
+                                                        </div>
+                                                        <div class="data-list">
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3097046484143880"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_4455ebfab3f24ab486968693a7d13b04@46958_oswg873078oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="AI大模型战火延续：大厂稳住阵地，“六小虎”走到分水岭"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3097046484143880" target="_blank">AI大模型战火延续：大厂稳住阵地，“六小虎”走到分水岭</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096883425361414"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_2498d8f0e7ec4c179d452bcba9ae134f@46958_oswg590582oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="“AI空间智能”未来已来，如何翻开人工智能下一章？"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096883425361414" target="_blank">“AI空间智能”未来已来，如何翻开人工智能下一章？</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096943308275206"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_9de8a8f69d6f43128d7e7c2734654740@46958_oswg920561oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="AI狙击，小语种遭遇“冰火两重天”？"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096943308275206" target="_blank">AI狙击，小语种遭遇“冰火两重天”？</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096921365548805"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_3bb202f7806741648bb9239fca0fcf5e@000000_oswg194829oswg1536oswg722_img_000?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center"
+                                                                    alt="AI基建，拉爆不少牛股"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096921365548805" target="_blank">AI基建，拉爆不少牛股</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096735621352964"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_46e72dcb7a824c0caa0879bf3803521f@46958_oswg772965oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="协议曝光，原来微软OpenAI这样定义AGI"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096735621352964" target="_blank">协议曝光，原来微软OpenAI这样定义AGI</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096890617368073"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_08cd6fa4fd78461896561c32ab70ab25@46958_oswg733414oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="OpenAI欲转营利性公司，补偿董事会多少钱才合理？"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096890617368073" target="_blank">OpenAI欲转营利性公司，补偿董事会多少钱才合理？</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096755728141825"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_036b9a4a3a0149968b6929d41d151a29@46958_oswg990330oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="首篇「角色扮演AI」综述，复旦等提出大模型三层人格分类框架：群体、角色、个性化"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096755728141825" target="_blank">首篇「角色扮演AI」综述，复旦等提出大模型三层人格分类框架：群体、角色、个性化</a>
+                                                            </div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096867925954049"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_9930a697db834fe882082bddb8954ac9@46958_oswg732969oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="国产AI一夜刷屏海外，2000 块GPU打造GPT-4o平替，AI大佬纷纷点赞"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096867925954049" target="_blank">国产AI一夜刷屏海外，2000
+                                                                块GPU打造GPT-4o平替，AI大佬纷纷点赞</a></div>
+                                                            <div class="list-item"><a class="article-item-pic"
+                                                                                      href="/p/3096584364035844"
+                                                                                      target="_blank"><img
+                                                                    class="scaleBig"
+                                                                    src="https://img.36krcdn.com/hsossms/20241227/v2_64a414ee4eea405ebd127f7f996dfa3c@6100851_oswg779935oswg1053oswg495_img_png?x-oss-process=image/resize,m_mfit,w_600,h_400,limit_0/crop,w_600,h_400,g_center/format,webp"
+                                                                    alt="脑机接口和 AI，一个硬币的两面"></a><a
+                                                                    class="article-item-title"
+                                                                    href="/p/3096584364035844" target="_blank">脑机接口和
+                                                                AI，一个硬币的两面</a></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="_popIn_recommend"></div>
+                                            </div>
+                                            <div class="article-right-container">
+                                                <div class="app-track-card">
+                                                    <div class="qrcode-wrapper "><span class="qrcode-img"><span
+                                                            data-adaption="cover"
+                                                            style="display: block; height: 100%; width: 100%; background-position: center center; background-repeat: no-repeat; background-size: cover; overflow: hidden; background-image: url(&quot;//static.36krcdn.com/36kr-web/static/qr_img.bd73a0ad.png?x-oss-process=image/resize,p_5/blur,r_3,s_2&quot;);"><img
+                                                            id="h_07e315f6" data-server-render="false"
+                                                            src="//static.36krcdn.com/36kr-web/static/qr_img.bd73a0ad.png?x-oss-process=image/resize,p_5/blur,r_3,s_2"
+                                                            alt=""
+                                                            style="height: 100%; width: 100%; object-fit: cover; transition: 0.3s; opacity: 0; display: block;"></span></span>
+                                                    </div>
+                                                </div>
+                                                <div class="list-author-wrapper">
+                                                    <div class="kr-card">
+                                                        <div class="top-line" style="height: 4px;"></div>
+                                                        <div class="kr-card-content ">
+                                                            <div class="author-detail-info ">
+                                                                <div class="author-detail-info-header clearfix"><a
+                                                                        href="/user/5569193" target="_blank"
+                                                                        rel="noopener noreferrer">
+                                                                    <div class="kr-avatar author-avatar"
+                                                                         style="background-image: url(&quot;https://tvax4.sinaimg.cn/crop.14.10.427.427.50/5309085bly8gexk0133moj20ch0cet8r.jpg&quot;);">
+                                                                        <i class="kr-avatar-v "
+                                                                           style="width: 24px; height: 24px; background-image: url(&quot;//static.36krcdn.com/36kr-web/static/ic_authentication_currency@3x.ad22d0c4.png&quot;);"></i>
+                                                                    </div>
+                                                                </a>
+                                                                    <div class="info-header-text">
+                                                                        <div class="clearfix">
+                                                                            <div>
+                                                                                <a class="author-name ellipsis-1 active"
+                                                                                   href="/user/5569193" target="_blank"
+                                                                                   rel="noopener noreferrer">投资者网</a>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="author-role-wrapper"
+                                                                             style="margin-top: 3px;"><span
+                                                                                class="author-role ">特邀作者</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <p class="author-description">促进信息透明。</p>
+                                                                <div class="author-detail-info-footer">
+                                                                    <div class="author-article-count"><i></i><span>发表文章291篇</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="author-wrapper">
+                                                                    <div class="inner-wrapper">
+                                                                        <div class="section"><h3 class="section-h3">
+                                                                            最近内容</h3>
+                                                                            <div class="author-itemslist">
+                                                                                <div class="item-wrapper-box"><a
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer "
+                                                                                        class="item-title"
+                                                                                        href="/p/3096460520623624"
+                                                                                        sensors_operation_list="author_latest_article">豆包定价一元的野心：字节跳动打响AI突围战</a>
+                                                                                    <div class="item-related-info"><span
+                                                                                            class="time item">17小时前</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div class="author-itemslist">
+                                                                                <div class="item-wrapper-box"><a
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer "
+                                                                                        class="item-title"
+                                                                                        href="/p/3096394355445504"
+                                                                                        sensors_operation_list="author_latest_article">光伏行业开始“反内卷”
+                                                                                    ，爱旭股份能熬过黑暗吗？</a>
+                                                                                    <div class="item-related-info"><span
+                                                                                            class="time item">19小时前</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div class="author-itemslist">
+                                                                                <div class="item-wrapper-box"><a
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer "
+                                                                                        class="item-title"
+                                                                                        href="/p/3095118212446338"
+                                                                                        sensors_operation_list="author_latest_article">“同仁堂之争”落幕
+                                                                                    京津合并牵出百年恩怨</a>
+                                                                                    <div class="item-related-info"><span
+                                                                                            class="time item">2024-12-25</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="article-803-ad-wrappper"></div>
+                                                <div class="article-814-ad-wrappper"></div>
+                                                <div>
+                                                    <div class="article-OrganArticle-wrappper"></div>
+                                                    <div class="article-Enterprise-wrappper">
+                                                        <div class="kr-article-enterprise-cards-wrapper"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="kr-recom-enterprise-article">
+                                                    <div class="kr-follow\n        \n        \n        "
+                                                         style="top: 30px;"></div>
+                                                </div>
+                                                <div id="article-detail-right-qifu"></div>
+                                                <div id="article-detail-right-qifu-script"></div>
+                                                <div class="kr-article-follow">
+                                                    <div class="kr-follow\n        \n        \n        "
+                                                         style="top: 30px;">
+                                                        <div class="article-follow-content">
+                                                            <div class="next-card-wrapper-box">
+                                                                <div class="kr-card">
+                                                                    <div class="top-line" style="height: 4px;"></div>
+                                                                    <div class="kr-card-content ">
+                                                                        <div class="next-cart-wrapper"
+                                                                             style="padding: 15px;">
+                                                                            <div class="section">
+                                                                                <div class="section-title section-item ellipsis-2"
+                                                                                     style="font-size: 14px; line-height: 25px;">
+                                                                                    <a href="/p/3096463343734536"
+                                                                                       target="_blank"
+                                                                                       rel="noopener noreferrer "
+                                                                                       class="section-title-a ellipsis-2"
+                                                                                       sensors_operation_list="next_card">生鲜乳价格的“寒冬”仍未去，伊利股份30多年的“神话”会破灭吗？</a>
+                                                                                </div>
+                                                                                <p class="section-brief section-item ellipsis-2">
+                                                                                    30多年的“神话”会破灭吗？</p>
+                                                                                <p class="section-publice-at section-item">
+                                                                                    17小时前</p></div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="kr-footer ">
+                    <div class="footer-content">
+                        <div class="footer-wrapper">
+                            <div class="about36kr-wrapper">
+                                <div class="title weight-bold">关于36氪</div>
+                                <div class="list-wrapper">
+                                    <li><a href="/station-business" rel="noopener noreferrer nofollow" target="_blank">城市合作</a>
+                                    </li>
+                                    <li><a href="/seek-report-new" rel="noopener noreferrer nofollow" target="_blank">寻求报道</a>
+                                    </li>
+                                    <li><a>我要入驻</a></li>
+                                    <li><a href="http://ir.36kr.com" rel="noopener noreferrer nofollow" target="_blank">投资者关系</a>
+                                    </li>
+                                </div>
+                                <div class="list-wrapper">
+                                    <li><a rel="noopener noreferrer nofollow">商务合作</a></li>
+                                    <li><a href="/pages/about" target="_blank"
+                                           rel="noopener noreferrer nofollow">关于我们</a></li>
+                                    <li><a>联系我们</a></li>
+                                    <li><a href="https://zhaopin.36kr.com" rel="noopener noreferrer nofollow"
+                                           target="_blank">加入我们</a></li>
+                                    <li style="height: 0px; width: 0px; opacity: 0; overflow: hidden;"><a
+                                            href="https://eu.36kr.com" target="_blank"
+                                            style="display: block; opacity: 0;">36氪欧洲站</a><a
+                                            href="https://eu.36kr.com/zh" target="_blank"
+                                            style="display: block; opacity: 0;">36氪欧洲站</a><a
+                                            href="https://eu.36kr.com/de" target="_blank"
+                                            style="display: block; opacity: 0;">36氪欧洲站</a><a
+                                            href="https://www.aicpb.com" target="_blank"
+                                            style="display: block; opacity: 0;">Ai产品日报</a></li>
+                                </div>
+                                <div class="list-one-wrapper"><a href="/refute-rumor-notice"
+                                                                 rel="noopener noreferrer nofollow" target="_blank">网络谣言信息举报入口</a>
+                                </div>
+                            </div>
+                            <div class="hotRecommend-wrapper">
+                                <div class="title weight-bold">热门推荐</div>
+                                <div class="list-wrapper">
+                                    <li><a href="/hot-list/catalog" rel="noopener noreferrer"
+                                           target="_blank">热门资讯</a></li>
+                                    <li><a href="/project" rel="noopener noreferrer" target="_blank">热门产品</a></li>
+                                    <li><a href="/tags" rel="noopener noreferrer" target="_blank">文章标签</a></li>
+                                    <li><a href="/nftags" rel="noopener noreferrer" target="_blank">快讯标签</a></li>
+                                </div>
+                            </div>
+                            <div class="parters-wrapper">
+                                <div class="title weight-bold">合作伙伴</div>
+                                <ul class="footer-partner">
+                                    <li><a href="https://www.aliyun.com/" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/aly.e9118f2f.png" alt="阿里云"
+                                            data-src="//static.36krcdn.com/36kr-web/static/aly.e9118f2f.png"></a></li>
+                                    <li><a href="https://www.volcengine.cn/" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/bytey.7484dc04.png" alt="火山引擎"
+                                            data-src="//static.36krcdn.com/36kr-web/static/bytey.7484dc04.png"></a></li>
+                                    <li><a><img src="//static.36krcdn.com/36kr-web/static/gaodi.9e9d6741.png" alt="高德"
+                                                data-src="//static.36krcdn.com/36kr-web/static/gaodi.9e9d6741.png"></a>
+                                    </li>
+                                    <li><a href="https://www.getui.com/cn/index.html" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/getui.d2af25d2.png" alt="个推"
+                                            data-src="//static.36krcdn.com/36kr-web/static/getui.d2af25d2.png"></a></li>
+                                    <li><a href="https://www.odaily.com" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/dailyPlanet.783b0e10.png"
+                                            alt="星球日报"
+                                            data-src="//static.36krcdn.com/36kr-web/static/dailyPlanet.783b0e10.png"></a>
+                                    </li>
+                                    <li><a href="https://www.jingdata.com" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/logo_jz@2x.525a51f1.png"
+                                            alt="鲸准"
+                                            data-src="//static.36krcdn.com/36kr-web/static/logo_jz@2x.525a51f1.png"></a>
+                                    </li>
+                                    <li><a href="https://www.krspace.cn" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/logo_kkj@2x.47737e8d.png"
+                                            alt="氪空间"
+                                            data-src="//static.36krcdn.com/36kr-web/static/logo_kkj@2x.47737e8d.png"></a>
+                                    </li>
+                                    <li><a href="https://www.futunn.com/" target="_blank"
+                                           rel="noopener noreferrer nofollow"><img
+                                            src="//static.36krcdn.com/36kr-web/static/ftnn.4f5db2d2.png" alt="富途牛牛"
+                                            data-src="//static.36krcdn.com/36kr-web/static/ftnn.4f5db2d2.png"></a></li>
+                                    <li><a href="https://www.36dianping.com/pk/" target="_blank"
+                                           rel="noopener noreferrer"><img
+                                            src="//static.36krcdn.com/36kr-web/static/logo_qifudianping@2x.c5635d6a.png"
+                                            alt="企服点评"
+                                            data-src="//static.36krcdn.com/36kr-web/static/logo_qifudianping@2x.c5635d6a.png"></a>
+                                    </li>
+                                    <li><a href="http://www.woshipm.com" target="_blank" rel="noopener noreferrer"><img
+                                            src="//static.36krcdn.com/36kr-web/static/renren@2x.f6ecd8fa.png"
+                                            alt="人人都是产品经理"
+                                            data-src="//static.36krcdn.com/36kr-web/static/renren@2x.f6ecd8fa.png"></a>
+                                    </li>
+                                    <li><a href="https://www.36linkr.com" target="_blank" rel="noopener noreferrer"><img
+                                            src="//static.36krcdn.com/36kr-web/static/lingke.34f56307.PNG" alt="领氪"
+                                            data-src="//static.36krcdn.com/36kr-web/static/lingke.34f56307.PNG"></a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="appDownload-wrapper">
+                                <div class="title weight-bold">36氪APP下载</div>
+                                <img src="//static.36krcdn.com/36kr-web/static/code_production.72d61993.png" alt="">
+                                <div class="info">iOS &amp; Android</div>
+                            </div>
+                            <div class="footerInfo-wrapper"><a href="https://36kr.com/" class="footer-logo"><img
+                                    src="//static.36krcdn.com/36kr-web/static/logoWhite.2a5eceda.png" alt="36氪"
+                                    data-src="//static.36krcdn.com/36kr-web/static/logoWhite.2a5eceda.png"></a>
+                                <div class="footer-center">
+                                    <div class="footer-center-top">本站由&nbsp;<span><a href="https://www.aliyun.com/"
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer nofollow">阿里云&nbsp;</a>提供计算与安全服务&nbsp;违法和不良信息、未成年人保护举报电话：010-89650707&nbsp;举报邮箱：jubao@36kr.com&nbsp;<a
+                                            href="https://www.12377.cn" target="_blank"
+                                            rel="noopener noreferrer nofollow"
+                                            style="font-weight: normal;">网上有害信息举报</a></span></div>
+                                    <div class="footer-center-bottom"><span class="license-wrapper"><div
+                                            class="license-pic"></div><span class="text">© 2011~2024 北京多氪信息科技有限公司 | </span></span><a
+                                            href="https://beian.miit.gov.cn/#/Integrated/index" target="_blank">京ICP备12031756号-6</a>
+                                        |
+                                        <a href="https://dxzhgl.miit.gov.cn/dxxzsp/xkz/xkzgl/resource/qiyesearch.jsp?num=%25E5%258C%2597%25E4%25BA%25AC%25E5%25A4%259A%25E6%25B0%25AA%25E4%25BF%25A1%25E6%2581%25AF%25E7%25A7%2591%25E6%258A%2580%25E6%259C%2589%25E9%2599%2590%25E5%2585%25AC%25E5%258F%25B8&amp;type=xuke"
+                                           target="_blank">京ICP证150143号</a> | <a
+                                                href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11010502036099"
+                                                target="_blank" rel="noopener noreferrer nofollow">
+                                            京公网安备11010502036099号</a></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="assit-wrapper undefined"><a href="https://36kr.com/mform/1755983296602372"
+                                                        rel="noopener noreferrer nofollow" target="_blank"
+                                                        class="feedBack">
+                    <div class="feedBack-img"></div>
+                    <div class="feedText">意见反馈</div>
+                </a>
+                    <div class="phone">
+                        <div class="phone-img"></div>
+                        <div class="phone-content"><img
+                                src="//static.36krcdn.com/36kr-web/static/code_production.72d61993.png" alt="">
+                            <div class="content"><span>36氪APP</span><span>让一部分人先看到未来</span></div>
+                        </div>
+                    </div>
+                    <div class="code">
+                        <div class="code-img"></div>
+                        <div class="code-content">
+                            <div class="tabs">
+                                <div data-index="0" class="bg">36氪</div>
+                                <div data-index="1">鲸准</div>
+                                <div data-index="2">氪空间</div>
+                            </div>
+                            <div class="tab-content">
+                                <div style="display: block;"><img
+                                        src="//static.36krcdn.com/36kr-web/static/kr.ad0c1158.jpg" alt="">
+                                    <p>推送和解读前沿、有料的科技创投资讯</p></div>
+                                <div style="display: none;"><img
+                                        src="//static.36krcdn.com/36kr-web/static/jingzhun.9a251862.jpg" alt="">
+                                    <p>一级市场金融信息和系统服务提供商</p></div>
+                                <div style="display: none;"><img
+                                        src="//static.36krcdn.com/36kr-web/static/krSpace.7efbe7d3.jpg" alt="">
+                                    <p>聚焦全球优秀创业者，项目融资率接近97%，领跑行业</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pure-article-wrapper-box">
+            <div class="article-pureReading-wrapper">
+                <div class=" article-pureReading-inner"></div>
+            </div>
+        </div>
+    </div>
+</div>
+\n\n\n\n
+</body>
+</html>',
