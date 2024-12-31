@@ -1,17 +1,15 @@
-import openai
+import ollama
 from openai import OpenAI
 
-
 MODEL = "llama3.2"
-MODEL_BASE_URL = 'http://127.0.0.1:11434/v1'  # use my server
-API_KEY_SET = 'ollama'
-SYS_PROMT={"role": "system",
-         "content": """
-         ## role
-         you are a prompt expert who can help to add tags to a prompt
+SYS_PROMPT = {
+    "role": "system",
+    "content": """
+        ## role
+        you are a prompt expert who can help to add tags to a prompt
 
         ## skill
-        you will review the input prompt and add key tags to it based on it's contents
+        you will review the input prompt and add key tags to it based on its contents
 
         ## constraints
         - you will output the prompt according to the example format
@@ -32,32 +30,40 @@ SYS_PROMT={"role": "system",
     ]
   }
 ]
-         """}
-
+    """
+}
 
 def prompt_rewrite(input_msg):
-    user_model = MODEL
     user_messages = [
-        SYS_PROMT,
-        # {"role": "user", "content": "Who won the world series in 2020?"},
-        # {"role": "assistant", "content": "The LA Dodgers won in 2020."},
+        SYS_PROMPT,
         {"role": "user", "content": input_msg}
     ]
-    client = client = OpenAI(
-        base_url=MODEL_BASE_URL,  # <<<<< you need to do the port mapping kuberate desktop in VScode
-        api_key=API_KEY_SET,  # required, but unused
-    )
-    response = client.chat.completions.create(
-        model=user_model,
+    client = OpenAI(base_url='http://127.0.0.1:11434/v1',api_key="test")
+    stream = client.chat.completions.create(
+        model=MODEL,
         messages=user_messages,
-
-        # tools=tools,
-        # tool_choice="auto",  # auto is default, but we'll be explicit
+        # stream=True  # Enable streaming
     )
-    response_message = response.choices[0].message.content
-    # print(response_message)
+    # Initialize a list to collect the streamed content
+    response = []
+    for chunk in stream:
+        # 在这里，每个 chunk 的结构都与之前的 completion 相似，但 message 字段被替换成了 delta 字段
+        delta = chunk.choices[0].delta  # <-- message 字段被替换成了 delta 字段
+
+        if delta.content:
+            # 我们在打印内容时，由于是流式输出，为了保证句子的连贯性，我们不人为地添加
+            # 换行符，因此通过设置 end="" 来取消 print 自带的换行符。
+            print(delta.content, end="")
+            response.append(delta.content)
+    # messages.append(completion.choices[0].message)
+    # print(completion.choices[0].message.content)
+    response = "".join(response)
+    # print(response)
     return response_message
 
 if __name__ == '__main__':
-    summary = prompt_rewrite(f"generate new prompt for 'A mystical forest with ancient trees twisted into intricate shapes, glowing mushrooms illuminating the path, and mythical creatures roaming freely.'")
+    summary = prompt_rewrite(
+        "generate new prompt for 'A mystical forest with ancient trees twisted into intricate shapes, glowing mushrooms illuminating the path, and mythical creatures roaming freely.'"
+    )
+    print("\nFull response received:")
     print(summary)

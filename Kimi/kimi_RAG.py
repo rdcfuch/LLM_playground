@@ -1,14 +1,14 @@
 from pathlib import Path
 from openai import OpenAI
+import json
 
-KIMI_MODEL="moonshot-v1-8k"
-Ollama_MODEL="llama3.2:latest"
-KIMI_API_KEY='sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw'
+KIMI_MODEL = "moonshot-v1-8k"
+Ollama_MODEL = "llama3.2:latest"
+KIMI_API_KEY = 'sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw'
 
 client = OpenAI(
     api_key=KIMI_API_KEY,  # 在这里将 MOONSHOT_API_KEY 替换为你从 Kimi 开放平台申请的 API Key
     base_url="https://api.moonshot.cn/v1",
-
 
 )
 
@@ -40,11 +40,24 @@ messages = [
 while True:
     # 然后调用 chat-completion, 获取 Kimi 的回答
     user_input = input("User:> ")
-    messages.append({"role":"user","content":user_input})
-    completion = client.chat.completions.create(
+    messages.append({"role": "user", "content": user_input})
+    stream = client.chat.completions.create(
         model=KIMI_MODEL,
         messages=messages,
         temperature=0.9,
+        stream=True,
     )
-    messages.append(completion.choices[0].message)
-    print(completion.choices[0].message.content)
+    response = []
+    for chunk in stream:
+        # 在这里，每个 chunk 的结构都与之前的 completion 相似，但 message 字段被替换成了 delta 字段
+        delta = chunk.choices[0].delta  # <-- message 字段被替换成了 delta 字段
+
+        if delta.content:
+            # 我们在打印内容时，由于是流式输出，为了保证句子的连贯性，我们不人为地添加
+            # 换行符，因此通过设置 end="" 来取消 print 自带的换行符。
+            print(delta.content, end="")
+            response.append(delta.content)
+    # messages.append(completion.choices[0].message)
+    # print(completion.choices[0].message.content)
+    response = "".join(response)
+    messages.append({"role":"assistant","content": response})
