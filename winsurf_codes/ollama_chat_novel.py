@@ -1,5 +1,5 @@
 import ollama
-from openai import OpenAI
+from chainlit import Chainlit
 
 MODEL = "llama3.2"
 SYS_PROMPT = {
@@ -34,29 +34,14 @@ SYS_PROMPT = {
 }
 
 def prompt_rewrite(input_msg):
+    chain = Chainlit(models=["lmstudio-community/c4ai-command-r-08-2024-GGUF"])
     user_messages = [
         SYS_PROMPT,
         {"role": "user", "content": input_msg}
     ]
-    client = OpenAI(base_url='http://127.0.0.1:11434/v1', api_key="test")
-    stream = client.chat.completions.create(
-        model=MODEL,
-        messages=user_messages,
-        stream=True  # Enable streaming
-    )
+    response = chain.predict(user_messages)
+    return response
     
-    # Initialize a string to collect the streamed content
-    response_message = ""
-    
-    # Process the stream
-    for chunk in stream:
-        if chunk.choices[0].delta.content is not None:
-            content = chunk.choices[0].delta.content
-            print(content, end="", flush=True)  # Print immediately
-            response_message += content
-            
-    return response_message
-
 if __name__ == '__main__':
     summary = prompt_rewrite(
         "generate new prompt for 'A mystical forest with ancient trees twisted into intricate shapes, glowing mushrooms illuminating the path, and mythical creatures roaming freely.'"
