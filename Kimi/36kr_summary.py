@@ -18,7 +18,9 @@ client = OpenAI(
 def summarize_contents(input_contents):
     summaries = []
     print("summarizing contents...")
+    i=1
     for article in input_contents:
+        print("processing item {}".format(i))
         try:
             messages = [
                 {
@@ -32,9 +34,14 @@ def summarize_contents(input_contents):
                 messages=messages,
                 temperature=0.9,
             )
-            summaries.append(completion.choices[0].message.content.replace('```html',"").replace('```',""))
+            result=completion.choices[0].message.content.replace('```html',"").replace('```',"")
+            print("{}:  {}".format(i,result))
+            i=i+1
+            summaries.append(result)
+            time.sleep(30)
 
         except Exception as e:
+            print("Error:  {}".format(str(e)))
             return ("error")
     print(summaries)
     return (summaries)
@@ -62,7 +69,7 @@ with gr.Blocks() as demo:
         print("processing...")
         url = "https://36kr.com/information/AI/"
         total_list=get_links(url)
-        article_url_list=total_list
+        article_url_list=total_list[:1]
         print("process this article: {}",format(article_url_list))
         contents = get_contents(article_url_list)
         print("get this content: {}",format(contents))
