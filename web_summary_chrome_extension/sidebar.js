@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const API_KEY = "sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw";
+    import CONFIG from './config.js';
+    const API_KEY = CONFIG.API_KEY;
     
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
