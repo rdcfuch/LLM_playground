@@ -1,6 +1,8 @@
+const API_KEY = "sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw";
+const BASE_URL = "https://api.moonshot.cn/v1";
+const MODEL = "moonshot-v1-8k";
+
 document.addEventListener('DOMContentLoaded', () => {
-    const API_KEY = "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";
-    
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
     const lengthSelect = document.getElementById('length');
@@ -28,14 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function generateSuggestedQuestions(summary) {
         const prompt = `基于这段总结，生成3个最重要的后续问题。请用中文回答，以JSON数组格式返回。示例：["问题1？", "问题2？", "问题3？"]。问题应该简洁且有针对性：\n\n${summary}`;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`${BASE_URL}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${API_KEY}`
             },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
+                model: MODEL,
                 messages: [
                     {
                         role: 'user',
@@ -117,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const pageContent = result[0].result;
             const summary = await generateSummary(pageContent, lengthSelect.value, API_KEY);
             
+            // Display the summary in the popup
             summaryElement.innerHTML = summary;
             summaryElement.classList.remove('hidden');
             questionsSection.classList.remove('hidden');
@@ -146,11 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Function to get page content
 function getPageContent() {
-    // Remove unnecessary elements
-    const elementsToRemove = document.querySelectorAll('script, style, nav, footer, header, aside, iframe, img');
-    elementsToRemove.forEach(element => element.remove());
-
-    // Get main content
+    // Get main content without modifying the DOM
     const mainContent = document.body.innerText;
     return mainContent.trim();
 }
@@ -165,14 +164,14 @@ async function generateSummary(content, length, apiKey) {
 
     const prompt = `请用中文总结以下内容，重点突出主要信息。总结长度限制在${maxLength}字以内。请以HTML格式返回，使用<h2>标题</h2>和<ul><li>要点</li></ul>的形式组织内容：\n\n${content}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: MODEL,
             messages: [
                 {
                     role: 'user',
@@ -197,14 +196,14 @@ async function generateSummary(content, length, apiKey) {
 async function generateAnswer(question, summary, apiKey) {
     const prompt = `基于这段总结:\n${summary}\n\n请回答这个问题:\n${question}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: MODEL,
             messages: [
                 {
                     role: 'user',
