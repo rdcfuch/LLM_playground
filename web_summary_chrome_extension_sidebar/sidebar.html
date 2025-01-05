@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Web Page Summarizer</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1><span class="material-icons">summarize</span>Web Page Summarizer</h1>
+        </header>
+        <main>
+            <div class="card summary-controls">
+                <div class="select-wrapper">
+                    <label for="length">Summary Length</label>
+                    <select id="length" class="material-select">
+                        <option value="short" selected>Short</option>
+                        <option value="medium">Medium</option>
+                        <option value="long">Long</option>
+                    </select>
+                </div>
+                <button id="summarize" class="material-button">
+                    <span class="material-icons">auto_awesome</span>
+                    Summarize
+                </button>
+            </div>
+            
+            <div id="summary-container" class="card">
+                <div id="loading" class="hidden">
+                    <div class="loading-spinner"></div>
+                    <span>Summarizing...</span>
+                </div>
+                <div id="summary" class="hidden"></div>
+                <div class="suggested-questions hidden"></div>
+            </div>
+
+            <div id="questions-section" class="card hidden">
+                <h2><span class="material-icons">help_outline</span>Ask a Follow-up Question</h2>
+                <div class="input-wrapper">
+                    <input type="text" id="question-input" placeholder="Type your question here...">
+                    <button id="ask-question" class="material-button">
+                        <span class="material-icons">send</span>
+                    </button>
+                </div>
+                <div id="answer-container"></div>
+            </div>
+        </main>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Web Page Summarizer",
+  "version": "1.0",
+  "description": "AI-powered web page summarizer with follow-up questions capability",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
+  "icons": {
+    "16": "images/8666594_slack_icon-2.png",
+    "48": "images/8666594_slack_icon-3.png",
+    "128": "images/8666594_slack_icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
