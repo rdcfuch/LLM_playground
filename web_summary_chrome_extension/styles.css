@@ -14,7 +14,7 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100vh;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     background-color: var(--background-color);
     color: var(--text-primary);
 }
@@ -86,7 +86,7 @@ main {
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 4px;
     background-color: transparent;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     font-size: 14px;
     color: var(--text-primary);
     cursor: pointer;
@@ -103,7 +103,7 @@ main {
     border-radius: 4px;
     background-color: var(--primary-color);
     color: var(--text-on-primary);
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -131,7 +131,7 @@ main {
     padding: 8px 12px;
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 4px;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     font-size: 14px;
     color: var(--text-primary);
 }
@@ -214,7 +214,7 @@ main {
     cursor: pointer;
     transition: background-color 0.2s;
     border: none;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     text-align: left;
     width: 100%;
 }
