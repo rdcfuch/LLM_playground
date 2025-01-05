@@ -2,8 +2,10 @@ from pathlib import Path
 from openai import OpenAI
 import json
 
-KIMI_MODEL = "moonshot-v1-8k"
 Ollama_MODEL = "llama3.2:latest"
+
+
+KIMI_MODEL = "moonshot-v1-8k"
 KIMI_API_KEY = 'sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw'
 
 client = OpenAI(

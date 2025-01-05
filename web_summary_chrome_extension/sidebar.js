@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const API_KEY = "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";
+    const API_KEY = "sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw";
     
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
@@ -11,23 +11,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const answerContainer = document.getElementById('answer-container');
     const suggestedQuestionsContainer = document.querySelector('.suggested-questions');
 
-    // Load saved preferences or set default to 'short'
-    chrome.storage.local.get(['summaryLength'], (result) => {
-        if (result.summaryLength) {
-            lengthSelect.value = result.summaryLength;
-        } else {
-            lengthSelect.value = 'short';
-            chrome.storage.local.set({ summaryLength: 'short' });
-        }
-    });
-
-    // Save preferences when changed
-    lengthSelect.addEventListener('change', () => {
-        chrome.storage.local.set({
-            summaryLength: lengthSelect.value
-        });
-    });
-
     // Check if there's a pending summarization request
     const result = await chrome.storage.local.get(['pendingSummarizeTabId']);
     if (result.pendingSummarizeTabId) {
@@ -37,17 +20,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         summarizeCurrentPage();
     }
 
+    // Always set to short and clear any existing preference
+    lengthSelect.value = 'short';
+    chrome.storage.local.set({ summaryLength: 'short' });
+
+    // Save preferences when changed
+    lengthSelect.addEventListener('change', () => {
+        chrome.storage.local.set({
+            summaryLength: lengthSelect.value
+        });
+    });
+
     async function generateSuggestedQuestions(summary) {
         const prompt = `Based on this summary, generate 3 follow-up questions that would be interesting to ask. Return them in a JSON array format. Example: ["Question 1?", "Question 2?", "Question 3?"]. Questions should be concise and focused:\n\n${summary}`;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${API_KEY}`
             },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
+                model: 'moonshot-v1-8k',
                 messages: [
                     {
                         role: 'user',
@@ -187,7 +181,7 @@ function getPageContent() {
     return paragraphs.map(p => p.innerText).join('\n\n');
 }
 
-// Function to generate summary using ChatGPT
+// Function to generate summary using Kimi API
 async function generateSummary(content, length, apiKey) {
     const lengthPrompts = {
         short: "Provide a very concise summary in 2-3 sentences.",
@@ -195,16 +189,16 @@ async function generateSummary(content, length, apiKey) {
         long: "Provide a detailed summary in about 8-10 sentences."
     };
 
-    const prompt = `Please summarize the following text. ${lengthPrompts[length]} Format the response in HTML with appropriate headings and bullet points for key information:\n\n${content}`;
+    const prompt = `Please summarize the following text in Chinese with length of ${lengthPrompts[length]} Format the response in HTML with appropriate headings and bullet points for key information:\n\n${content}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: 'moonshot-v1-8k',
             messages: [
                 {
                     role: 'user',
@@ -224,18 +218,18 @@ async function generateSummary(content, length, apiKey) {
     return data.choices[0].message.content;
 }
 
-// Function to generate answer using ChatGPT
+// Function to generate answer using Kimi API
 async function generateAnswer(question, summary, apiKey) {
     const prompt = `Based on this summary:\n${summary}\n\nPlease answer this question:\n${question}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: 'moonshot-v1-8k',
             messages: [
                 {
                     role: 'user',
