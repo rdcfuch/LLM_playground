@@ -5,6 +5,7 @@ class ChatApp {
         this.chatMessages = document.getElementById('chat-messages');
         this.toolButtons = document.querySelectorAll('.action-btn');
         this.modelSelect = document.querySelector('select[aria-label="Select AI Model"]');
+        this.translateButton = document.querySelector('[data-tool="translate"]');
         
         this.API_URL = 'http://127.0.0.1:8080';
         this.isProcessing = false;
@@ -40,6 +41,18 @@ class ChatApp {
             this.messageInput.style.height = 'auto';
             this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
         });
+
+        // Add translate button event listener
+        if (this.translateButton) {
+            console.log('Adding translate button listener');
+            this.translateButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Translate button clicked');
+                this.translateText();
+            });
+        } else {
+            console.error('Translate button not found');
+        }
     }
 
     async sendMessage() {
@@ -86,6 +99,55 @@ class ChatApp {
         }
     }
 
+    async translateText() {
+        const content = this.messageInput.value.trim();
+        if (!content || this.isProcessing) return;
+
+        this.isProcessing = true;
+        this.translateButton.disabled = true;
+
+        try {
+            const selectedModel = this.modelSelect.value;
+            const response = await fetch(`${this.API_URL}/chat/translate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content,
+                    role: selectedModel
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // Add original text and translation to chat
+            this.addMessageToChat(content, 'user');
+            // Ensure we're only displaying the translation content
+            if (data && typeof data.content === 'string') {
+                this.addMessageToChat(data.content.trim(), 'assistant');
+            } else {
+                throw new Error('Invalid translation response format');
+            }
+            
+            // Clear input after successful translation
+            this.messageInput.value = '';
+            this.messageInput.style.height = 'auto';
+
+        } catch (error) {
+            console.error('Translation Error:', error);
+            this.addMessageToChat(`Translation Error: ${error.message}`, 'system');
+        } finally {
+            this.isProcessing = false;
+            this.translateButton.disabled = false;
+        }
+    }
+
     addMessageToChat(content, role) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}-message`;
@@ -106,9 +168,10 @@ class ChatApp {
         contentDiv.className = 'message-content';
         
         // Handle markdown or code blocks if present
-        if (content.includes('```')) {
+        if (typeof content === 'string' && content.includes('```')) {
             contentDiv.innerHTML = this.formatCodeBlocks(content);
         } else {
+            // Ensure content is treated as plain text
             contentDiv.textContent = content;
         }
         

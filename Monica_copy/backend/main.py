@@ -10,6 +10,7 @@ import os
 import httpx
 import logging
 import json
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -190,6 +191,84 @@ async def chat_kimi(message: Message):
             
     except Exception as e:
         logger.error(f"KIMI Error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)}
+        )
+
+@app.post("/chat/translate")
+async def translate_text(message: Message):
+    try:
+        # Check which model to use based on the role field
+        if message.role == "kimi":
+            if not kimi_client:
+                raise HTTPException(status_code=503, detail="KIMI translation service not available")
+            client = kimi_client
+            model_name = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+        else:
+            if not gpt_client:
+                raise HTTPException(status_code=503, detail="GPT-4 translation service not available")
+            client = gpt_client
+            model_name = "gpt-4"
+
+        logger.debug(f"Received translation request with content: {message.content}")
+        print(f"Received translation request with content: {message.content}")
+        print(f"Using model: {model_name}")
+
+        # Detect language and create appropriate prompt
+        is_chinese = any('\u4e00' <= char <= '\u9fff' for char in message.content)
+        target_lang = "English" if is_chinese else "Chinese"
+        
+        try:
+            messages = [
+                {"role": "system", "content": f"You are a translator. Translate the text to {target_lang}. Return ONLY the translation, no explanations, no labels, no quotes. don't show any unrelated explainations e.g. Translation (undefined → undefined) using undefined: "},
+                {"role": "user", "content": message.content}
+            ]
+            print(f"Translation request: {messages}")
+            
+            chat_completion = client.chat.completions.create(
+                model=model_name,
+                messages=messages
+            )
+            
+            response_content = chat_completion.choices[0].message.content.strip()
+            # Clean up any prefixes like "Translation:" or "Translation (X → Y):"
+            response_content = re.sub(r'^Translation.*?:', '', response_content, flags=re.IGNORECASE).strip()
+            # Remove any remaining text that looks like a prefix with arrows or colons
+            response_content = re.sub(r'^.*?[→:]\s*', '', response_content).strip()
+            
+            logger.debug(f"Translation response: {response_content}")
+            print(f"Translation response: {response_content}")
+            
+            return JSONResponse(content={
+                "content": response_content,
+                "type": "text"
+            })
+            
+        except OpenAIError as e:
+            error_message = str(e)
+            print(f"Translation API Error: {error_message}")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Full error object: {e.__dict__}")
+            
+            if "Rate limit" in error_message:
+                detail = "Rate limit exceeded. Please try again in a moment."
+            elif "Incorrect API key" in error_message:
+                detail = "Invalid API key. Please check your API key configuration."
+            else:
+                detail = f"Translation API Error: {error_message}"
+            
+            logger.error(f"Translation API Error: {error_message}")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": detail}
+            )
+            
+    except Exception as e:
+        print(f"Unexpected error in translation: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error details: {e.__dict__ if hasattr(e, '__dict__') else 'No details available'}")
+        logger.error(f"Translation Error: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"detail": str(e)}

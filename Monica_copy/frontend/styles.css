@@ -108,27 +108,45 @@ body {
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    border: 1px solid var(--border-color);
-    background: var(--secondary-color);
-    border-radius: 20px;
+    border: none;
+    border-radius: 8px;
+    background: #f5f5f5;
+    color: #333;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
 .action-btn:hover {
-    background-color: var(--primary-color);
-    color: var(--secondary-color);
-    border-color: var(--primary-color);
+    background: #e0e0e0;
     transform: translateY(-1px);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+    background: #007AFF;
+    color: white;
 }
 
 .action-btn .material-icons {
     font-size: 20px;
 }
 
-.btn-text {
+.action-btn .btn-text {
     font-size: 14px;
     font-weight: 500;
+}
+
+/* Disable button styles */
+.action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f5f5f5;
+    color: #666;
+}
+
+.translate-btn:disabled {
+    background: #ccc;
+    color: #666;
 }
 
 /* Chat Container Styles */
