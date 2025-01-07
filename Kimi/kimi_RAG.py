@@ -18,7 +18,7 @@ client = OpenAI(
 # 上传文件时，我们可以直接使用 openai 库的文件上传 API，使用标准库 pathlib 中的 Path 构造文件
 # 对象，并将其传入 file 参数即可，同时将 purpose 参数设置为 file-extract；注意，目前文件上传
 # 接口仅支持 file-extract 一种 purpose 值。
-file_object = client.files.create(file=Path("/Users/fcfu/Downloads/aa.txt"), purpose="file-extract")
+file_object = client.files.create(file=Path("/Users/fcfu/Downloads/项链.txt"), purpose="file-extract")
 
 # 获取结果
 # file_content = client.files.retrieve_content(file_id=file_object.id)

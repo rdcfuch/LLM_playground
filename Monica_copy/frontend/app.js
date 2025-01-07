@@ -70,7 +70,9 @@ class ChatApp {
         try {
             // Get the selected model and choose endpoint
             const selectedModel = this.modelSelect.value;
-            const endpoint = selectedModel === 'kimi' ? '/chat/kimi' : '/chat/gpt4o';
+            const endpoint = selectedModel === 'kimi' ? '/chat/kimi' : 
+                            selectedModel === 'deepseek' ? '/chat/deepseek' : 
+                            '/chat/gpt4o';
 
             const response = await fetch(`${this.API_URL}${endpoint}`, {
                 method: 'POST',

@@ -98,6 +98,25 @@ except Exception as e:
     logger.error(f"Error initializing KIMI client: {str(e)}")
     kimi_client = None
 
+try:
+    deepseek_api_key = os.getenv("DeepSeek_API_KEY")
+    deepseek_base_url = os.getenv("DeepSeek_BASE_URL")
+    if not deepseek_api_key or not deepseek_base_url:
+        raise ValueError("DeepSeek credentials not found in environment variables")
+    
+    deepseek_client = OpenAI(
+        api_key=deepseek_api_key,
+        base_url=deepseek_base_url,
+        http_client=httpx.Client(
+            base_url=deepseek_base_url,
+            timeout=httpx.Timeout(60.0)
+        )
+    )
+    logger.info("DeepSeek client initialized successfully")
+except Exception as e:
+    logger.error(f"Error initializing DeepSeek client: {str(e)}")
+    deepseek_client = None
+
 @app.post("/chat/gpt4o")
 async def chat_gpt(message: Message):
     try:
@@ -196,6 +215,42 @@ async def chat_kimi(message: Message):
             content={"detail": str(e)}
         )
 
+@app.post("/chat/deepseek")
+async def chat_deepseek(message: Message):
+    try:
+        if not deepseek_client:
+            raise HTTPException(status_code=503, detail="DeepSeek service not available")
+
+        logger.debug(f"Received DeepSeek request with content: {message.content}")
+        
+        try:
+            chat_completion = deepseek_client.chat.completions.create(
+                model=os.getenv("DeepSeek_MODEL", "deepseek-chat"),
+                messages=[
+                    {"role": "system", "content": "You are Monica, a helpful and friendly AI assistant. You provide clear, concise, and accurate responses."},
+                    {"role": "user", "content": message.content}
+                ]
+            )
+            
+            response_content = chat_completion.choices[0].message.content
+            logger.debug(f"DeepSeek response: {response_content}")
+            
+            return JSONResponse(content={"content": response_content, "type": "text"})
+            
+        except OpenAIError as e:
+            logger.error(f"DeepSeek API Error: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"DeepSeek API Error: {str(e)}"}
+            )
+            
+    except Exception as e:
+        logger.error(f"DeepSeek Error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)}
+        )
+
 @app.post("/chat/translate")
 async def translate_text(message: Message):
     try:
@@ -205,6 +260,11 @@ async def translate_text(message: Message):
                 raise HTTPException(status_code=503, detail="KIMI translation service not available")
             client = kimi_client
             model_name = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+        elif message.role == "deepseek":
+            if not deepseek_client:
+                raise HTTPException(status_code=503, detail="Deepseek translation service not available")
+            client = deepseek_client
+            model_name = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
         else:
             if not gpt_client:
                 raise HTTPException(status_code=503, detail="GPT-4 translation service not available")
@@ -226,10 +286,19 @@ async def translate_text(message: Message):
             ]
             print(f"Translation request: {messages}")
             
-            chat_completion = client.chat.completions.create(
-                model=model_name,
-                messages=messages
-            )
+            if message.role == "deepseek":
+                # Deepseek specific handling
+                chat_completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.3  # Lower temperature for more accurate translations
+                )
+            else:
+                # Default handling for KIMI and GPT-4
+                chat_completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages
+                )
             
             response_content = chat_completion.choices[0].message.content.strip()
             # Clean up any prefixes like "Translation:" or "Translation (X → Y):"
