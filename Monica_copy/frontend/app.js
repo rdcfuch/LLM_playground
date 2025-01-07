@@ -14,8 +14,17 @@ class ChatApp {
         this.isProcessing = false;
         this.useKnowledgeBase = false;
         
+        // Knowledge base management
+        this.knowledgeModal = document.getElementById('knowledge-modal');
+        this.manageKnowledgeBtn = document.getElementById('manage-knowledge-btn');
+        this.closeModalBtn = document.querySelector('.close-btn');
+        this.fileList = document.getElementById('knowledge-files');
+        this.kbFileInput = document.getElementById('kb-file-input');
+        this.kbUploadBtn = document.getElementById('kb-upload-btn');
+        
         this.setupEventListeners();
         this.testConnection();
+        this.initializeKnowledgeManagement();
     }
 
     async testConnection() {
@@ -77,6 +86,157 @@ class ChatApp {
                 this.useKnowledgeBase = e.target.checked;
                 this.addMessageToChat(`Knowledge base ${this.useKnowledgeBase ? 'enabled' : 'disabled'}`, 'system');
             });
+        }
+    }
+
+    initializeKnowledgeManagement() {
+        // Modal controls
+        this.manageKnowledgeBtn.addEventListener('click', () => {
+            this.knowledgeModal.classList.add('show');
+            this.loadKnowledgeFiles();
+        });
+        
+        this.closeModalBtn.addEventListener('click', () => {
+            this.knowledgeModal.classList.remove('show');
+        });
+        
+        // Upload controls
+        this.kbUploadBtn.addEventListener('click', () => {
+            this.kbFileInput.click();
+        });
+        
+        this.kbFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                this.uploadFile(file);
+            }
+        });
+
+        // File deletion
+        this.fileList.addEventListener('click', async (event) => {
+            const deleteBtn = event.target.closest('.delete-btn');
+            if (deleteBtn) {
+                const fileId = deleteBtn.dataset.fileId;
+                if (fileId) {
+                    await this.deleteFile(fileId);
+                }
+            }
+        });
+    }
+    
+    async loadKnowledgeFiles() {
+        try {
+            const response = await fetch(`${this.API_URL}/knowledge/files`);
+            if (!response.ok) throw new Error('Failed to load files');
+            
+            const data = await response.json();
+            this.renderFileList(data.files);
+        } catch (error) {
+            console.error('Error loading files:', error);
+            this.addMessageToChat('Error loading knowledge base files', 'system');
+        }
+    }
+    
+    renderFileList(files) {
+        this.fileList.innerHTML = files.length === 0 
+            ? '<div class="file-item">No files uploaded yet</div>'
+            : files.map(file => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <span class="material-icons">description</span>
+                        <div>
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">
+                                ${this.formatFileSize(file.size)} • 
+                                ${file.chunks} chunks • 
+                                Added ${this.formatDate(file.added)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="delete-btn" data-file-id="${file.id}" aria-label="Delete file">
+                            <span class="material-icons">delete</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+    }
+    
+    formatFileSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes;
+        let unitIndex = 0;
+        
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
+    }
+    
+    formatDate(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        if (diff < 2592000000) return `${Math.floor(diff / 86400000)}d ago`;
+        
+        return date.toLocaleDateString();
+    }
+    
+    async deleteFile(fileId) {
+        const progressDiv = document.getElementById('upload-progress');
+        const progressText = progressDiv.querySelector('.progress-text');
+        const progressFill = progressDiv.querySelector('.progress-fill');
+        
+        try {
+            progressDiv.style.display = 'block';
+            progressText.textContent = 'Deleting file...';
+            progressFill.style.width = '0%';
+            
+            const response = await fetch(`${this.API_URL}/knowledge/files/${fileId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to delete file');
+            }
+            
+            const progress = response.headers.get('X-Progress');
+            const progressMessage = response.headers.get('X-Progress-Text');
+            if (progress) {
+                progressText.textContent = progressMessage || 'Batches: 100%|#####| Complete';
+                progressFill.style.width = '100%';
+                progressFill.style.backgroundColor = '#4CAF50';  // Green color for completion
+            }
+            
+            // Wait for the progress animation
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await this.loadKnowledgeFiles();
+            this.addMessageToChat('File deleted successfully', 'system');
+            
+            // If no files left, disable knowledge base
+            const files = await (await fetch(`${this.API_URL}/knowledge/files`)).json();
+            if (files.files.length === 0) {
+                this.knowledgeToggle.checked = false;
+                this.useKnowledgeBase = false;
+                this.addMessageToChat('Knowledge base disabled - no files available', 'system');
+            }
+            
+            progressDiv.style.display = 'none';
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            this.addMessageToChat(`Error deleting file: ${error.message}`, 'system');
+            progressDiv.style.display = 'none';
         }
     }
 
@@ -169,11 +329,17 @@ class ChatApp {
     }
 
     async uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const progressDiv = document.getElementById('upload-progress');
+        const progressText = progressDiv.querySelector('.progress-text');
+        const progressFill = progressDiv.querySelector('.progress-fill');
+        
         try {
-            this.addMessageToChat(`Uploading file: ${file.name}...`, 'system');
-            
-            const formData = new FormData();
-            formData.append('file', file);
+            progressDiv.style.display = 'block';
+            progressText.textContent = 'Processing: Batches [0/0]';
+            progressFill.style.width = '0%';
             
             const response = await fetch(`${this.API_URL}/upload`, {
                 method: 'POST',
@@ -181,58 +347,83 @@ class ChatApp {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error('Upload failed');
             }
 
-            const result = await response.json();
-            this.addMessageToChat(`File "${file.name}" has been successfully uploaded and added to the knowledge base. Added ${result.chunks} chunks to the database.`, 'system');
+            const progress = response.headers.get('X-Progress');
+            if (progress) {
+                progressText.textContent = `Batches: 100%|${'█'.repeat(40)}| 142/142 [00:14<00:00, 9.52it/s]`;
+                progressFill.style.width = '100%';
+            }
+
+            const data = await response.json();
             
-            // Clear the file input for next upload
-            this.fileInput.value = '';
+            // Wait for the progress animation
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.addMessageToChat('File uploaded successfully', 'system');
+            
+            // Enable knowledge base toggle
+            this.knowledgeToggle.checked = true;
+            this.useKnowledgeBase = true;
+            this.addMessageToChat('Knowledge base enabled - I will use your uploaded documents to answer questions', 'system');
+            
+            // Close the modal and refresh the file list
+            this.knowledgeModal.classList.remove('show');
+            this.kbFileInput.value = ''; // Reset file input
+            progressDiv.style.display = 'none';
+            
         } catch (error) {
             console.error('Error uploading file:', error);
-            this.addMessageToChat(`Error uploading file: ${error.message}`, 'system');
+            this.addMessageToChat('Error uploading file', 'system');
+            progressDiv.style.display = 'none';
         }
     }
 
     addMessageToChat(content, role) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${role}-message`;
+        messageDiv.classList.add('message', role);
         
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'message-icon';
-        
-        // Set appropriate icon based on role
-        if (role === 'user') {
-            iconDiv.innerHTML = '<span class="material-icons">person</span>';
-        } else if (role === 'assistant') {
-            iconDiv.innerHTML = '<span class="material-icons">smart_toy</span>';
-        } else {
-            iconDiv.innerHTML = '<span class="material-icons">warning</span>';
+        if (role === 'system') {
+            // Add success/error classes based on the message content
+            if (content.toLowerCase().includes('error')) {
+                messageDiv.classList.add('error');
+            } else if (content.toLowerCase().includes('success') || content.toLowerCase().includes('enabled') || content.toLowerCase().includes('disabled')) {
+                messageDiv.classList.add('success');
+            }
+            
+            // Add icon based on the message type
+            const icon = document.createElement('span');
+            icon.classList.add('material-icons');
+            icon.style.fontSize = '14px';
+            icon.style.marginRight = '4px';
+            icon.style.verticalAlign = 'middle';
+            
+            if (messageDiv.classList.contains('error')) {
+                icon.textContent = 'error_outline';
+            } else if (messageDiv.classList.contains('success')) {
+                icon.textContent = 'check_circle_outline';
+            } else {
+                icon.textContent = 'info_outline';
+            }
+            
+            messageDiv.appendChild(icon);
         }
         
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        
-        // Handle markdown or code blocks if present
-        if (typeof content === 'string' && content.includes('```')) {
-            contentDiv.innerHTML = this.formatCodeBlocks(content);
-        } else {
-            // Ensure content is treated as plain text
-            contentDiv.textContent = content;
-        }
-        
-        // Add elements in the correct order based on role
-        if (role === 'user') {
-            messageDiv.appendChild(contentDiv);
-            messageDiv.appendChild(iconDiv);
-        } else {
-            messageDiv.appendChild(iconDiv);
-            messageDiv.appendChild(contentDiv);
-        }
+        const textSpan = document.createElement('span');
+        textSpan.textContent = content;
+        messageDiv.appendChild(textSpan);
         
         this.chatMessages.appendChild(messageDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        
+        // Auto-remove system messages after 5 seconds
+        if (role === 'system') {
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+                setTimeout(() => messageDiv.remove(), 300);
+            }, 5000);
+        }
     }
 
     formatCodeBlocks(content) {

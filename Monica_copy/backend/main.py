@@ -35,8 +35,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["X-Progress"]
 )
 
 class Message(BaseModel):
@@ -488,6 +489,37 @@ async def generate(type: str, prompt: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/knowledge/files")
+async def list_knowledge_files():
+    """List all files in the knowledge base."""
+    try:
+        files = rag_manager.list_files()
+        return JSONResponse(content={"files": files})
+    except Exception as e:
+        logger.error(f"Error listing knowledge base files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
+
+@app.delete("/knowledge/files/{file_id}")
+async def delete_knowledge_file(file_id: str):
+    """Delete a file from the knowledge base."""
+    try:
+        logger.info(f"Attempting to delete file with ID: {file_id}")
+        if rag_manager.delete_file(file_id):
+            logger.info(f"Successfully deleted file with ID: {file_id}")
+            return JSONResponse(
+                content={"message": f"File {file_id} deleted successfully"},
+                headers={
+                    'X-Progress': '100',
+                    'X-Progress-Text': 'Batches: 100%|#####| Complete'
+                }
+            )
+        else:
+            logger.warning(f"File not found with ID: {file_id}")
+            raise HTTPException(status_code=404, detail=f"File {file_id} not found")
+    except Exception as e:
+        logger.error(f"Error deleting file {file_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
+
 @app.post("/knowledge/add")
 async def add_knowledge(knowledge: KnowledgeBase):
     """Add new documents to the knowledge base."""
@@ -609,35 +641,39 @@ async def upload_file(file: UploadFile):
     """Upload a file and add its contents to the knowledge base."""
     try:
         content = await file.read()
-        file_extension = file.filename.lower().split('.')[-1]
+        file_ext = os.path.splitext(file.filename)[1].lower()
         
         # Extract text based on file type
-        if file_extension == 'pdf':
+        if file_ext == '.pdf':
             text = extract_text_from_pdf(content)
-        elif file_extension == 'docx':
+        elif file_ext == '.docx':
             text = extract_text_from_docx(content)
-        elif file_extension == 'txt':
+        elif file_ext == '.txt':
             text = extract_text_from_txt(content)
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload PDF, DOCX, or TXT files.")
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+            
+        # Split text into chunks
+        chunks = text.split('\n\n')
+        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
         
-        # Split text into chunks (simple sentence-based splitting)
-        chunks = [chunk.strip() for chunk in text.split('.') if chunk.strip()]
-        
-        # Add chunks to knowledge base
-        rag_manager.add_knowledge(
-            texts=chunks,
-            metadata=[{"source": file.filename, "chunk": i} for i in range(len(chunks))]
+        # Add to knowledge base with metadata
+        file_id = rag_manager.add_knowledge(
+            chunks,
+            [{'source': file.filename}] * len(chunks)
         )
         
         return JSONResponse(content={
-            "message": f"Successfully processed {file.filename} and added to knowledge base",
+            "message": "File uploaded successfully",
+            "file_id": file_id,
             "chunks": len(chunks)
+        }, headers={
+            'X-Progress': '100'
         })
         
     except Exception as e:
-        logger.error(f"Error processing file upload: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8080)

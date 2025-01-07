@@ -100,6 +100,9 @@
                             <input type="checkbox" id="knowledge-toggle" aria-label="Toggle knowledge base">
                             <span class="slider round"></span>
                         </label>
+                        <button class="tool-btn" id="manage-knowledge-btn" aria-label="Manage knowledge base">
+                            <span class="material-icons">folder</span>
+                        </button>
                     </div>
                     <button class="mic-btn" aria-label="Voice input">
                         <span class="material-icons">mic</span>
@@ -114,6 +117,36 @@
                     </button>
                 </div>
             </footer>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Management Modal -->
+    <div class="modal" id="knowledge-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Knowledge Base Management</h2>
+                <button class="close-btn" aria-label="Close">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="file-list" id="knowledge-files">
+                    <!-- Files will be listed here -->
+                </div>
+                <div class="upload-progress" id="upload-progress" style="display: none">
+                    <div class="progress-text"></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+                <div class="upload-section">
+                    <input type="file" id="kb-file-input" style="display: none">
+                    <button class="primary-btn" id="kb-upload-btn">
+                        <span class="material-icons">upload_file</span>
+                        Upload File
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

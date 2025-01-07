@@ -109,3 +109,42 @@ class VectorStore:
                     "metadata": self.metadata[i],
                 }
         return None
+
+    def delete_by_metadata(self, filter_dict: Dict) -> None:
+        """Delete documents that match the metadata filter."""
+        if not self.texts:
+            return
+            
+        # Find indices to keep
+        indices_to_keep = []
+        new_texts = []
+        new_metadata = []
+        
+        for i, meta in enumerate(self.metadata):
+            keep = True  # Default to keeping the document
+            for key, value in filter_dict.items():
+                if key in meta and meta[key] == value:
+                    keep = False  # Don't keep if it matches the filter
+                    break
+            
+            if keep:
+                indices_to_keep.append(i)
+                new_texts.append(self.texts[i])
+                new_metadata.append(self.metadata[i])
+        
+        if not indices_to_keep:
+            # If no documents remain, clear everything
+            self.clear()
+            return
+            
+        # Create new index with kept documents
+        new_index = faiss.IndexFlatL2(self.dimension)
+        if indices_to_keep:
+            # Get embeddings for kept documents
+            embeddings = self.model.encode(new_texts)
+            new_index.add(np.array(embeddings).astype('float32'))
+        
+        # Update instance variables
+        self.index = new_index
+        self.texts = new_texts
+        self.metadata = new_metadata
