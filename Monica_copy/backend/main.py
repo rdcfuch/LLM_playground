@@ -57,6 +57,10 @@ async def health_check():
 
 # Initialize API clients
 gpt_client = None
+kimi_client = None
+deepseek_client = None
+rag_manager = RAGManager()
+
 try:
     openai_api_key = os.getenv("OPENAI_API_KEY")
     print(f"openai api key: {openai_api_key}")
@@ -125,9 +129,6 @@ try:
 except Exception as e:
     logger.error(f"Error initializing DeepSeek client: {str(e)}")
     deepseek_client = None
-
-# Initialize RAG manager
-rag_manager = RAGManager()
 
 # Global variables to store chat history for each model and service
 chat_histories = {

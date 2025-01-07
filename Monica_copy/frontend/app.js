@@ -6,9 +6,13 @@ class ChatApp {
         this.toolButtons = document.querySelectorAll('.action-btn');
         this.modelSelect = document.querySelector('select[aria-label="Select AI Model"]');
         this.translateButton = document.querySelector('[data-tool="translate"]');
+        this.fileInput = document.getElementById('file-input');
+        this.attachButton = document.getElementById('attach-button');
+        this.knowledgeToggle = document.getElementById('knowledge-toggle');
         
         this.API_URL = 'http://127.0.0.1:8080';
         this.isProcessing = false;
+        this.useKnowledgeBase = false;
         
         this.setupEventListeners();
         this.testConnection();
@@ -53,51 +57,65 @@ class ChatApp {
         } else {
             console.error('Translate button not found');
         }
+
+        // Add file upload functionality
+        if (this.attachButton && this.fileInput) {
+            this.attachButton.addEventListener('click', () => {
+                this.fileInput.click();
+            });
+
+            this.fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    await this.uploadFile(file);
+                }
+            });
+        }
+
+        if (this.knowledgeToggle) {
+            this.knowledgeToggle.addEventListener('change', (e) => {
+                this.useKnowledgeBase = e.target.checked;
+                this.addMessageToChat(`Knowledge base ${this.useKnowledgeBase ? 'enabled' : 'disabled'}`, 'system');
+            });
+        }
     }
 
     async sendMessage() {
-        const content = this.messageInput.value.trim();
-        if (!content || this.isProcessing) return;
+        if (this.isProcessing) return;
+
+        const message = this.messageInput.value.trim();
+        if (!message) return;
 
         this.isProcessing = true;
-        this.sendButton.disabled = true;
-
-        // Add user message to chat
-        this.addMessageToChat(content, 'user');
         this.messageInput.value = '';
         this.messageInput.style.height = 'auto';
-
+        
         try {
-            // Get the selected model and choose endpoint
-            const selectedModel = this.modelSelect.value;
-            const endpoint = selectedModel === 'kimi' ? '/chat/kimi' : 
-                            selectedModel === 'deepseek' ? '/chat/deepseek' : 
-                            '/chat/gpt4o';
-
+            this.addMessageToChat(message, 'user');
+            
+            const endpoint = this.useKnowledgeBase ? '/knowledge/query' : `/chat/${this.modelSelect.value}`;
             const response = await fetch(`${this.API_URL}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    content: content,
-                    role: 'user'
-                })
+                body: JSON.stringify({ 
+                    content: message,
+                    role: this.modelSelect.value 
+                }),
             });
 
-            const data = await response.json();
-            
             if (!response.ok) {
-                throw new Error(data.detail || `HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            this.addMessageToChat(data.content, 'assistant');
+            const data = await response.json();
+            this.addMessageToChat(data.response || data.content, 'assistant');
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error sending message:', error);
             this.addMessageToChat(`Error: ${error.message}`, 'system');
         } finally {
             this.isProcessing = false;
-            this.sendButton.disabled = false;
         }
     }
 
@@ -147,6 +165,33 @@ class ChatApp {
         } finally {
             this.isProcessing = false;
             this.translateButton.disabled = false;
+        }
+    }
+
+    async uploadFile(file) {
+        try {
+            this.addMessageToChat(`Uploading file: ${file.name}...`, 'system');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${this.API_URL}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            this.addMessageToChat(`File "${file.name}" has been successfully uploaded and added to the knowledge base. Added ${result.chunks} chunks to the database.`, 'system');
+            
+            // Clear the file input for next upload
+            this.fileInput.value = '';
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            this.addMessageToChat(`Error uploading file: ${error.message}`, 'system');
         }
     }
 

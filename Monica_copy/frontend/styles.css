@@ -336,13 +336,21 @@ textarea:focus {
     font-size: 14px;
 }
 
-.web-toggle {
+.web-toggle,
+.knowledge-toggle {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-right: 16px;
 }
 
-/* Switch Toggle Styles */
+.web-toggle .material-icons,
+.knowledge-toggle .material-icons {
+    font-size: 20px;
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
 .switch {
     position: relative;
     display: inline-block;
@@ -378,20 +386,20 @@ textarea:focus {
     transition: .4s;
 }
 
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
 input:checked + .slider {
     background-color: var(--primary-color);
 }
 
 input:checked + .slider:before {
     transform: translateX(16px);
-}
-
-.slider.round {
-    border-radius: 34px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
 }
 
 .mic-btn, .accessibility-btn {

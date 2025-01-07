@@ -56,7 +56,8 @@
         <div class="input-section">
             <div class="input-container">
                 <div class="input-tools">
-                    <button class="tool-btn" aria-label="Add attachment">
+                    <input type="file" id="file-input" style="display: none">
+                    <button class="tool-btn" id="attach-button" data-tool="attach" aria-label="Add attachment">
                         <span class="material-icons">attach_file</span>
                     </button>
                     <button class="tool-btn" aria-label="Text editing">
@@ -90,6 +91,13 @@
                         <span class="material-icons">language</span>
                         <label class="switch">
                             <input type="checkbox" aria-label="Toggle web integration">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="knowledge-toggle">
+                        <span class="material-icons">psychology</span>
+                        <label class="switch">
+                            <input type="checkbox" id="knowledge-toggle" aria-label="Toggle knowledge base">
                             <span class="slider round"></span>
                         </label>
                     </div>
