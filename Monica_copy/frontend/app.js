@@ -274,7 +274,7 @@ class ChatApp {
             }
 
             const data = await response.json();
-            this.addMessageToChat(data.content || data.response, 'assistant');
+            this.addMessageToChat(data.content, 'assistant', data.sources);
         } catch (error) {
             console.error('Error sending message:', error);
             this.addMessageToChat(`Error: ${error.message}`, 'system');
@@ -333,105 +333,39 @@ class ChatApp {
         return messageDiv;
     }
 
-    async translateText() {
-        const content = this.messageInput.value.trim();
-        if (!content || this.isProcessing) return;
-
-        this.isProcessing = true;
-        this.translateButton.disabled = true;
-
-        try {
-            const selectedModel = this.modelSelect.value;
-            const response = await fetch(`${this.API_URL}/chat/translate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    content: content,
-                    role: selectedModel
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            
-            // Add original text and translation to chat
-            this.addMessageToChat(content, 'user');
-            // Ensure we're only displaying the translation content
-            if (data && typeof data.content === 'string') {
-                this.addMessageToChat(data.content.trim(), 'assistant');
-            } else {
-                throw new Error('Invalid translation response format');
-            }
-            
-            // Clear input after successful translation
-            this.messageInput.value = '';
-            this.messageInput.style.height = 'auto';
-
-        } catch (error) {
-            console.error('Translation Error:', error);
-            this.addMessageToChat(`Translation Error: ${error.message}`, 'system');
-        } finally {
-            this.isProcessing = false;
-            this.translateButton.disabled = false;
-        }
-    }
-
-    async uploadFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
+    addMessageToChat(message, role, sources = null) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}-message`;
         
-        const progressDiv = document.getElementById('upload-progress');
-        const progressText = progressDiv.querySelector('.progress-text');
-        const progressFill = progressDiv.querySelector('.progress-fill');
+        // Create message content div
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
         
-        try {
-            progressDiv.style.display = 'block';
-            progressText.textContent = 'Processing: Batches [0/0]';
-            progressFill.style.width = '0%';
+        // Add message text
+        const textDiv = document.createElement('div');
+        textDiv.textContent = message;
+        contentDiv.appendChild(textDiv);
+        
+        // If there are sources, add them inside content div
+        if (sources && sources.length > 0) {
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'message-sources';
+            sourcesDiv.innerHTML = '<h4>Sources:</h4>';
             
-            const response = await fetch(`${this.API_URL}/upload`, {
-                method: 'POST',
-                body: formData
+            const sourcesList = document.createElement('ol');
+            sources.forEach(source => {
+                const sourceItem = document.createElement('li');
+                sourceItem.innerHTML = `<strong>${source.source}</strong>: ${source.text}`;
+                sourcesList.appendChild(sourceItem);
             });
-
-            if (!response.ok) {
-                throw new Error('Upload failed');
-            }
-
-            const progress = response.headers.get('X-Progress');
-            if (progress) {
-                progressText.textContent = `Batches: 100%|${'█'.repeat(40)}| 142/142 [00:14<00:00, 9.52it/s]`;
-                progressFill.style.width = '100%';
-            }
-
-            const data = await response.json();
             
-            // Wait for the progress animation
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            this.addMessageToChat('File uploaded successfully', 'system');
-            
-            // Enable knowledge base toggle
-            this.knowledgeToggle.checked = true;
-            this.useKnowledgeBase = true;
-            this.addMessageToChat('Knowledge base enabled - I will use your uploaded documents to answer questions', 'system');
-            
-            // Close the modal and refresh the file list
-            this.knowledgeModal.classList.remove('show');
-            this.kbFileInput.value = ''; // Reset file input
-            progressDiv.style.display = 'none';
-            
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            this.addMessageToChat('Error uploading file', 'system');
-            progressDiv.style.display = 'none';
+            sourcesDiv.appendChild(sourcesList);
+            contentDiv.appendChild(sourcesDiv);
         }
+        
+        messageDiv.appendChild(contentDiv);
+        this.chatMessages.appendChild(messageDiv);
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
 
     cleanMarkdown(text) {
@@ -448,76 +382,6 @@ class ChatApp {
             .replace(/ \*\*/g, '**')
             .replace(/\* /g, '*')
             .replace(/ \*/g, '*');
-    }
-
-    addMessageToChat(content, role) {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', role);
-        
-        if (role === 'system') {
-            // Handle system messages as before
-            const icon = document.createElement('span');
-            icon.classList.add('material-icons');
-            icon.style.fontSize = '14px';
-            icon.style.marginRight = '4px';
-            icon.style.verticalAlign = 'middle';
-            
-            if (messageDiv.classList.contains('error')) {
-                icon.textContent = 'error_outline';
-            } else if (messageDiv.classList.contains('success')) {
-                icon.textContent = 'check_circle_outline';
-            } else {
-                icon.textContent = 'info_outline';
-            }
-            
-            messageDiv.appendChild(icon);
-            const textSpan = document.createElement('span');
-            textSpan.textContent = content;
-            messageDiv.appendChild(textSpan);
-        } else {
-            // Create message header with role icon
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'message-header';
-            
-            const iconDiv = document.createElement('div');
-            iconDiv.className = 'message-icon';
-            const icon = document.createElement('span');
-            icon.className = 'material-icons';
-            icon.textContent = role === 'user' ? 'person' : 'smart_toy';
-            iconDiv.appendChild(icon);
-            headerDiv.appendChild(iconDiv);
-            
-            // Add message content
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            if (role === 'assistant') {
-                // Clean and parse markdown for assistant messages
-                const cleanedContent = this.cleanMarkdown(content);
-                contentDiv.innerHTML = marked.parse(cleanedContent);
-                // Apply syntax highlighting to code blocks
-                contentDiv.querySelectorAll('pre code').forEach((block) => {
-                    Prism.highlightElement(block);
-                });
-            } else {
-                // Keep user messages as plain text
-                contentDiv.textContent = content;
-            }
-            
-            messageDiv.appendChild(headerDiv);
-            messageDiv.appendChild(contentDiv);
-        }
-        
-        this.chatMessages.appendChild(messageDiv);
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-        
-        // Auto-remove system messages after 5 seconds
-        if (role === 'system') {
-            setTimeout(() => {
-                messageDiv.style.opacity = '0';
-                setTimeout(() => messageDiv.remove(), 300);
-            }, 5000);
-        }
     }
 
     formatCodeBlocks(content) {

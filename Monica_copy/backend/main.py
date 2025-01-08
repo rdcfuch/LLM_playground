@@ -544,8 +544,27 @@ async def query_knowledge(message: Message):
                 content={"content": "Please provide a question to search the knowledge base."}
             )
         
-        # Generate RAG prompt with context
-        rag_prompt = rag_manager.generate_rag_prompt(message.content)
+        # Get search results
+        results = rag_manager.query_knowledge(message.content)
+        
+        # Format context with reference numbers
+        context = "Relevant information from the knowledge base:\n\n"
+        for i, result in enumerate(results, 1):
+            context += f"[{i}] {result['text']}\n"
+            if result['metadata'].get('source'):
+                context += f"    Source: {result['metadata']['source']}\n"
+            context += "\n"
+        
+        # Create prompt with instructions to use reference numbers
+        prompt = f"""Based on the following context and the user's question, provide a comprehensive and accurate answer.
+Use reference numbers [1], [2], etc. when citing information from the context. Make sure to cite your sources.
+If the context doesn't contain relevant information, acknowledge that and provide a general response.
+
+{context}
+
+User's question: {message.content}
+
+Answer:"""
         
         # Get the appropriate model client
         if message.role == "kimi":
@@ -570,18 +589,28 @@ async def query_knowledge(message: Message):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant. Use the provided context to answer questions accurately."
+                    "content": "You are a helpful assistant. Use the provided context to answer questions accurately. When referring to information from the context, use reference numbers [1], [2], etc."
                 },
-                {"role": "user", "content": rag_prompt}
+                {"role": "user", "content": prompt}
             ],
             temperature=0.7
         )
         
         response_content = chat_completion.choices[0].message.content
         
+        # Format sources for frontend display
+        sources = []
+        for i, result in enumerate(results, 1):
+            sources.append({
+                "id": i,
+                "text": result['text'][:200] + "...",  # Truncate long texts
+                "source": result['metadata'].get('source', 'Unknown')
+            })
+        
         return JSONResponse(content={
             "content": response_content,
-            "type": "text"
+            "type": "text",
+            "sources": sources
         })
         
     except Exception as e:
