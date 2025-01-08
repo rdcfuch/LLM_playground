@@ -42,7 +42,7 @@ app.add_middleware(
 
 class Message(BaseModel):
     content: str
-    role: str = "user"
+    role: str = "gpt4"
 
 class KnowledgeBase(BaseModel):
     texts: List[str]
@@ -536,8 +536,18 @@ async def add_knowledge(knowledge: KnowledgeBase):
 @app.post("/knowledge/query")
 async def query_knowledge(message: Message):
     """Query the knowledge base and get a response using RAG."""
+    print("Query the knowledge base and get a response using RAG.\n\n")
     try:
-        # Get the appropriate model client based on role
+        if not message.content:
+            return JSONResponse(
+                status_code=400,
+                content={"content": "Please provide a question to search the knowledge base."}
+            )
+        
+        # Generate RAG prompt with context
+        rag_prompt = rag_manager.generate_rag_prompt(message.content)
+        
+        # Get the appropriate model client
         if message.role == "kimi":
             if not kimi_client:
                 raise HTTPException(status_code=503, detail="KIMI service not available")
@@ -553,40 +563,21 @@ async def query_knowledge(message: Message):
                 raise HTTPException(status_code=503, detail="GPT-4 service not available")
             client = gpt_client
             model_name = "gpt-4"
-
-        # Generate RAG prompt
-        rag_prompt = rag_manager.generate_rag_prompt(message.content)
         
-        # Get chat history for the model
-        messages = get_messages_for_service(message.role, "chat")
-        
-        # Initialize with system prompt if needed
-        if not messages:
-            messages.append({
-                "role": "system",
-                "content": get_system_prompt_for_service(message.role, "chat")
-            })
-        
-        # Add RAG prompt as user message
-        messages.append({
-            "role": "user",
-            "content": rag_prompt
-        })
-
         # Get response from the model
         chat_completion = client.chat.completions.create(
             model=model_name,
-            messages=messages,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. Use the provided context to answer questions accurately."
+                },
+                {"role": "user", "content": rag_prompt}
+            ],
             temperature=0.7
         )
         
         response_content = chat_completion.choices[0].message.content
-        
-        # Add response to chat history
-        messages.append({
-            "role": "assistant",
-            "content": response_content
-        })
         
         return JSONResponse(content={
             "content": response_content,
@@ -597,7 +588,7 @@ async def query_knowledge(message: Message):
         logger.error(f"Error querying knowledge base: {str(e)}")
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Error querying knowledge base: {str(e)}"}
+            content={"content": f"Error querying knowledge base: {str(e)}"}
         )
 
 @app.post("/knowledge/clear")
@@ -637,43 +628,49 @@ def extract_text_from_txt(file_bytes):
     return file_bytes.decode(encoding)
 
 @app.post("/upload")
-async def upload_file(file: UploadFile):
-    """Upload a file and add its contents to the knowledge base."""
+async def upload_files(files: List[UploadFile] = File(...)):
+    """Upload multiple files and add their contents to the knowledge base."""
     try:
-        content = await file.read()
-        file_ext = os.path.splitext(file.filename)[1].lower()
-        
-        # Extract text based on file type
-        if file_ext == '.pdf':
-            text = extract_text_from_pdf(content)
-        elif file_ext == '.docx':
-            text = extract_text_from_docx(content)
-        elif file_ext == '.txt':
-            text = extract_text_from_txt(content)
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+        results = []
+        for file in files:
+            content = await file.read()
+            file_ext = os.path.splitext(file.filename)[1].lower()
             
-        # Split text into chunks
-        chunks = text.split('\n\n')
-        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
-        
-        # Add to knowledge base with metadata
-        file_id = rag_manager.add_knowledge(
-            chunks,
-            [{'source': file.filename}] * len(chunks)
-        )
+            # Extract text based on file type
+            if file_ext == '.pdf':
+                text = extract_text_from_pdf(content)
+            elif file_ext == '.docx':
+                text = extract_text_from_docx(content)
+            elif file_ext == '.txt':
+                text = extract_text_from_txt(content)
+            else:
+                logger.warning(f"Skipping unsupported file: {file.filename}")
+                continue
+                
+            # Split text into chunks
+            chunks = text.split('\n\n')
+            chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+            
+            # Add to knowledge base with metadata
+            file_id = rag_manager.add_knowledge(
+                chunks,
+                [{'source': file.filename}] * len(chunks)
+            )
+            
+            results.append({
+                "filename": file.filename,
+                "file_id": file_id,
+                "chunks": len(chunks)
+            })
         
         return JSONResponse(content={
-            "message": "File uploaded successfully",
-            "file_id": file_id,
-            "chunks": len(chunks)
-        }, headers={
-            'X-Progress': '100'
+            "message": f"Successfully uploaded {len(results)} files",
+            "files": results
         })
         
     except Exception as e:
-        logger.error(f"Error uploading file: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+        logger.error(f"Error uploading files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading files: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8080)

@@ -3,135 +3,136 @@ class ChatApp {
         this.messageInput = document.getElementById('message-input');
         this.sendButton = document.getElementById('send-button');
         this.chatMessages = document.getElementById('chat-messages');
-        this.toolButtons = document.querySelectorAll('.action-btn');
         this.modelSelect = document.querySelector('select[aria-label="Select AI Model"]');
-        this.translateButton = document.querySelector('[data-tool="translate"]');
-        this.fileInput = document.getElementById('file-input');
-        this.attachButton = document.getElementById('attach-button');
-        this.knowledgeToggle = document.getElementById('knowledge-toggle');
-        
-        this.API_URL = 'http://127.0.0.1:8080';
-        this.isProcessing = false;
-        this.useKnowledgeBase = false;
+        this.kbToggle = document.getElementById('kb-toggle');
         
         // Knowledge base management
-        this.knowledgeModal = document.getElementById('knowledge-modal');
-        this.manageKnowledgeBtn = document.getElementById('manage-knowledge-btn');
+        this.kbModal = document.getElementById('knowledge-modal');
+        this.manageKbBtn = document.getElementById('manage-kb-btn');
         this.closeModalBtn = document.querySelector('.close-btn');
         this.fileList = document.getElementById('knowledge-files');
         this.kbFileInput = document.getElementById('kb-file-input');
         this.kbUploadBtn = document.getElementById('kb-upload-btn');
         
-        // Configure marked options
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (Prism.languages[lang]) {
-                    return Prism.highlight(code, Prism.languages[lang], lang);
-                }
-                return code;
-            },
-            breaks: true,
-            gfm: true
-        });
+        // Initialize state
+        this.isProcessing = false;
+        this.useKnowledgeBase = false;
+        this.API_URL = 'http://127.0.0.1:8080';
         
+        // Event listeners
         this.setupEventListeners();
-        this.testConnection();
         this.initializeKnowledgeManagement();
     }
-
-    async testConnection() {
-        try {
-            const response = await fetch(`${this.API_URL}/health`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            console.log('Backend health check:', data);
-        } catch (error) {
-            console.error('Backend connection failed:', error);
-            this.addMessageToChat('Error: Cannot connect to the AI service. Please make sure the backend server is running.', 'system');
-        }
-    }
-
+    
     setupEventListeners() {
-        this.sendButton.addEventListener('click', () => this.sendMessage());
-        this.messageInput.addEventListener('keypress', (e) => {
+        // Send message on button click
+        this.sendButton.addEventListener('click', () => {
+            this.sendMessage();
+        });
+        
+        // Send message on Enter (but Shift+Enter for new line)
+        this.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
             }
         });
-
+        
+        // Knowledge base toggle
+        this.kbToggle.addEventListener('change', async (e) => {
+            const isChecked = e.target.checked;
+            
+            if (isChecked) {
+                try {
+                    const response = await fetch(`${this.API_URL}/knowledge/files`);
+                    const data = await response.json();
+                    
+                    if (!data.files || data.files.length === 0) {
+                        e.target.checked = false;
+                        this.useKnowledgeBase = false;
+                        this.addMessageToChat('Cannot enable knowledge base: No files available. Please upload files first.', 'system');
+                        return;
+                    }
+                    
+                    this.useKnowledgeBase = true;
+                    this.addMessageToChat('Knowledge base enabled', 'system');
+                } catch (error) {
+                    console.error('Error checking knowledge base:', error);
+                    e.target.checked = false;
+                    this.useKnowledgeBase = false;
+                    this.addMessageToChat('Error checking knowledge base. Please try again.', 'system');
+                }
+            } else {
+                this.useKnowledgeBase = false;
+                this.addMessageToChat('Knowledge base disabled', 'system');
+            }
+        });
+        
+        // Auto-resize textarea
         this.messageInput.addEventListener('input', () => {
             this.messageInput.style.height = 'auto';
             this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
         });
-
-        // Add translate button event listener
-        if (this.translateButton) {
-            console.log('Adding translate button listener');
-            this.translateButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                console.log('Translate button clicked');
-                this.translateText();
-            });
-        } else {
-            console.error('Translate button not found');
-        }
-
-        // Add file upload functionality
-        if (this.attachButton && this.fileInput) {
-            this.attachButton.addEventListener('click', () => {
-                this.fileInput.click();
-            });
-
-            this.fileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    await this.uploadFile(file);
-                }
-            });
-        }
-
-        if (this.knowledgeToggle) {
-            this.knowledgeToggle.addEventListener('change', (e) => {
-                this.useKnowledgeBase = e.target.checked;
-                this.addMessageToChat(`Knowledge base ${this.useKnowledgeBase ? 'enabled' : 'disabled'}`, 'system');
-            });
-        }
     }
-
+    
     initializeKnowledgeManagement() {
         // Modal controls
-        this.manageKnowledgeBtn.addEventListener('click', () => {
-            this.knowledgeModal.classList.add('show');
+        this.manageKbBtn.addEventListener('click', () => {
+            this.kbModal.style.display = 'block';
             this.loadKnowledgeFiles();
         });
         
         this.closeModalBtn.addEventListener('click', () => {
-            this.knowledgeModal.classList.remove('show');
+            this.kbModal.style.display = 'none';
         });
         
-        // Upload controls
+        // File upload
         this.kbUploadBtn.addEventListener('click', () => {
             this.kbFileInput.click();
         });
         
-        this.kbFileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                this.uploadFile(file);
+        this.kbFileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                const formData = new FormData();
+                files.forEach(file => {
+                    formData.append('files', file);
+                });
+                
+                const progressDiv = document.getElementById('upload-progress');
+                progressDiv.style.display = 'block';
+                progressDiv.textContent = 'Uploading files...';
+                
+                try {
+                    const response = await fetch(`${this.API_URL}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Upload failed');
+                    }
+                    
+                    const data = await response.json();
+                    await this.loadKnowledgeFiles();
+                    this.kbToggle.checked = true;
+                    this.useKnowledgeBase = true;
+                    this.addMessageToChat(`${data.message} (${data.files.map(f => f.filename).join(', ')})`, 'system');
+                } catch (error) {
+                    console.error('Error uploading files:', error);
+                    this.addMessageToChat(`Error uploading files: ${error.message}`, 'system');
+                } finally {
+                    progressDiv.style.display = 'none';
+                    this.kbFileInput.value = '';
+                }
             }
         });
-
-        // File deletion
-        this.fileList.addEventListener('click', async (event) => {
-            const deleteBtn = event.target.closest('.delete-btn');
-            if (deleteBtn) {
-                const fileId = deleteBtn.dataset.fileId;
-                if (fileId) {
-                    await this.deleteFile(fileId);
-                }
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === this.kbModal) {
+                this.kbModal.style.display = 'none';
             }
         });
     }
@@ -139,8 +140,6 @@ class ChatApp {
     async loadKnowledgeFiles() {
         try {
             const response = await fetch(`${this.API_URL}/knowledge/files`);
-            if (!response.ok) throw new Error('Failed to load files');
-            
             const data = await response.json();
             this.renderFileList(data.files);
         } catch (error) {
@@ -150,28 +149,43 @@ class ChatApp {
     }
     
     renderFileList(files) {
-        this.fileList.innerHTML = files.length === 0 
-            ? '<div class="file-item">No files uploaded yet</div>'
-            : files.map(file => `
-                <div class="file-item">
-                    <div class="file-info">
-                        <span class="material-icons">description</span>
-                        <div>
-                            <div class="file-name">${file.name}</div>
-                            <div class="file-meta">
-                                ${this.formatFileSize(file.size)} • 
-                                ${file.chunks} chunks • 
-                                Added ${this.formatDate(file.added)}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="file-actions">
-                        <button class="delete-btn" data-file-id="${file.id}" aria-label="Delete file">
-                            <span class="material-icons">delete</span>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+        this.fileList.innerHTML = '';
+        
+        if (files.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'empty-message';
+            emptyMessage.textContent = 'No files in knowledge base';
+            this.fileList.appendChild(emptyMessage);
+            return;
+        }
+        
+        files.forEach(file => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'file-info';
+            
+            const fileName = document.createElement('div');
+            fileName.className = 'file-name';
+            fileName.textContent = file.name;
+            
+            const fileDetails = document.createElement('div');
+            fileDetails.className = 'file-details';
+            fileDetails.textContent = `${this.formatFileSize(file.size)} · ${this.formatDate(file.added)}`;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '<span class="material-icons">delete</span>';
+            deleteBtn.onclick = () => this.deleteFile(file.id);
+            
+            fileInfo.appendChild(fileName);
+            fileInfo.appendChild(fileDetails);
+            fileItem.appendChild(fileInfo);
+            fileItem.appendChild(deleteBtn);
+            
+            this.fileList.appendChild(fileItem);
+        });
     }
     
     formatFileSize(bytes) {
@@ -189,49 +203,21 @@ class ChatApp {
     
     formatDate(dateStr) {
         const date = new Date(dateStr);
-        const now = new Date();
-        const diff = now - date;
-        
-        if (diff < 60000) return 'just now';
-        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-        if (diff < 2592000000) return `${Math.floor(diff / 86400000)}d ago`;
-        
         return date.toLocaleDateString();
     }
     
     async deleteFile(fileId) {
         const progressDiv = document.getElementById('upload-progress');
-        const progressText = progressDiv.querySelector('.progress-text');
-        const progressFill = progressDiv.querySelector('.progress-fill');
+        progressDiv.style.display = 'block';
         
         try {
-            progressDiv.style.display = 'block';
-            progressText.textContent = 'Deleting file...';
-            progressFill.style.width = '0%';
-            
-            const response = await fetch(`${this.API_URL}/knowledge/files/${fileId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            const response = await fetch(`${this.API_URL}/knowledge/delete/${fileId}`, {
+                method: 'DELETE'
             });
             
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Failed to delete file');
+                throw new Error('Failed to delete file');
             }
-            
-            const progress = response.headers.get('X-Progress');
-            const progressMessage = response.headers.get('X-Progress-Text');
-            if (progress) {
-                progressText.textContent = progressMessage || 'Batches: 100%|#####| Complete';
-                progressFill.style.width = '100%';
-                progressFill.style.backgroundColor = '#4CAF50';  // Green color for completion
-            }
-            
-            // Wait for the progress animation
-            await new Promise(resolve => setTimeout(resolve, 1000));
             
             await this.loadKnowledgeFiles();
             this.addMessageToChat('File deleted successfully', 'system');
@@ -239,7 +225,7 @@ class ChatApp {
             // If no files left, disable knowledge base
             const files = await (await fetch(`${this.API_URL}/knowledge/files`)).json();
             if (files.files.length === 0) {
-                this.knowledgeToggle.checked = false;
+                this.kbToggle.checked = false;
                 this.useKnowledgeBase = false;
                 this.addMessageToChat('Knowledge base disabled - no files available', 'system');
             }
@@ -267,6 +253,7 @@ class ChatApp {
             
             const thinkingDiv = this.showThinking();
             
+            // Always use knowledge query when toggle is enabled, otherwise use model-specific endpoint
             const endpoint = this.useKnowledgeBase ? '/knowledge/query' : `/chat/${this.modelSelect.value}`;
             const response = await fetch(`${this.API_URL}${endpoint}`, {
                 method: 'POST',
@@ -282,16 +269,31 @@ class ChatApp {
             thinkingDiv.remove();
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                throw new Error(data.content || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            this.addMessageToChat(data.response || data.content, 'assistant');
+            this.addMessageToChat(data.content || data.response, 'assistant');
         } catch (error) {
             console.error('Error sending message:', error);
             this.addMessageToChat(`Error: ${error.message}`, 'system');
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    async testConnection() {
+        try {
+            const response = await fetch(`${this.API_URL}/health`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('Backend health check:', data);
+        } catch (error) {
+            console.error('Backend connection failed:', error);
+            this.addMessageToChat('Error: Cannot connect to the AI service. Please make sure the backend server is running.', 'system');
         }
     }
 
