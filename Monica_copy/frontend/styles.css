@@ -12,6 +12,10 @@
     --bg-primary: #f5f7f9;
     --icon-bg: #4a5568;
     --disabled-color: #ccc;
+    --ds-button-color: #007bff;
+    --ds-button-hover-color: #0056b3;
+    --button-border-color: #007bff;
+    --button-text-color: #ffffff;
 }
 
 * {
@@ -566,8 +570,9 @@ textarea:focus {
 .switch {
     position: relative;
     display: inline-block;
-    width: 40px;
-    height: 24px;
+    width: 36px;
+    height: 16px;
+    margin: 0;
 }
 
 .switch input {
@@ -583,52 +588,40 @@ textarea:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background: linear-gradient(90deg, #4D6BFE 0%, #6948D6 100%);
+    opacity: 0.85;
     transition: .4s;
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
-    left: 4px;
-    bottom: 4px;
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
     background-color: white;
     transition: .4s;
 }
 
+input:checked + .slider {
+    background: linear-gradient(90deg, #4D6BFE 0%, #6948D6 100%);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px rgba(77, 107, 254, 0.3);
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
 .slider.round {
-    border-radius: 24px;
+    border-radius: 8px;
 }
 
 .slider.round:before {
     border-radius: 50%;
-}
-
-input:checked + .slider {
-    background-color: var(--primary-color);
-}
-
-input:checked + .slider:before {
-    transform: translateX(16px);
-}
-
-.mic-btn, .accessibility-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: none;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.mic-btn:hover, .accessibility-btn:hover {
-    background-color: rgba(0, 0, 0, 0.05);
 }
 
 /* Upgrade Button Styles */
@@ -1021,4 +1014,43 @@ input:checked + .slider:before {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.ds-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    border: 1px solid var(--button-border-color);
+    background-color: var(--ds-button-color);
+    color: var(--button-text-color);
+    gap: 8px;
+}
+
+.ds-button:hover {
+    background-color: var(--ds-button-hover-color);
+}
+
+.ds-button__icon {
+    display: flex;
+    align-items: center;
+}
+
+.ds-button--m {
+    height: 36px;
+    font-size: 14px;
+}
+
+.ds-button--rect {
+    border-radius: 8px;
+}
+
+.ds-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }

@@ -18,6 +18,7 @@ class ChatApp {
         this.isProcessing = false;
         this.useKnowledgeBase = false;
         this.API_URL = 'http://127.0.0.1:8080';
+        this.webEnabled = false;
         
         // Event listeners
         this.setupEventListeners();
@@ -31,7 +32,7 @@ class ChatApp {
         });
         
         // Send message on Enter (but Shift+Enter for new line)
-        this.messageInput.addEventListener('keydown', (e) => {
+        this.messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
@@ -68,11 +69,30 @@ class ChatApp {
             }
         });
         
+        // Initialize web search toggle
+        const webToggle = document.querySelector('#web-toggle input[type="checkbox"]');
+        if (webToggle) {
+            webToggle.addEventListener('change', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling to parent button
+                this.webEnabled = e.target.checked;
+            });
+        }
+        
         // Auto-resize textarea
         this.messageInput.addEventListener('input', () => {
             this.messageInput.style.height = 'auto';
             this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
         });
+        
+        // Initialize toggle switch
+        const toggleSwitch = document.querySelector('.toggle-switch');
+        if (toggleSwitch) {
+            toggleSwitch.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling to parent button
+                toggleSwitch.classList.toggle('active');
+                this.webEnabled = !this.webEnabled;
+            });
+        }
     }
     
     initializeKnowledgeManagement() {

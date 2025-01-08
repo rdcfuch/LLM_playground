@@ -91,12 +91,24 @@
                             <option value="gpt4o">GPT-4</option>
                         </select>
                     </div>
-                    <div class="web-toggle">
-                        <span class="material-icons">language</span>
-                        <label class="switch">
-                            <input type="checkbox" aria-label="Toggle web integration">
-                            <span class="slider round"></span>
-                        </label>
+                    <div id="web-toggle" role="button" class="ds-button ds-button--primary ds-button--filled ds-button--rect ds-button--m" tabindex="0" style="--ds-button-color: #DBEAFE; --button-text-color: #4D6BFE; --button-border-color: rgba(0, 122, 255, 0.15); --ds-button-hover-color: #C3DAF8;">
+                        <div class="ds-button__icon">
+                            <span style="transition: transform 0.4s ease-out; transform: rotate(0deg);">
+                                <div class="ds-icon" style="font-size: 16px; width: 16px; height: 16px; color: rgb(77, 107, 254);">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"></circle>
+                                        <path d="M10 1c1.657 0 3 4.03 3 9s-1.343 9-3 9M10 19c-1.657 0-3-4.03-3-9s1.343-9 3-9M1 10h18" stroke="currentColor" stroke-width="1.8"></path>
+                                    </svg>
+                                </div>
+                            </span>
+                        </div>
+                        <span>Search</span>
+                        <div class="ds-icon" style="margin-left: 4px; position: relative;">
+                            <label class="switch">
+                                <input type="checkbox" aria-label="Toggle web search">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                     </div>
                     <div class="knowledge-toggle">
                         <span class="material-icons">psychology</span>
