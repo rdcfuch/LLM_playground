@@ -22,6 +22,18 @@ class ChatApp {
         this.kbFileInput = document.getElementById('kb-file-input');
         this.kbUploadBtn = document.getElementById('kb-upload-btn');
         
+        // Configure marked options
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (Prism.languages[lang]) {
+                    return Prism.highlight(code, Prism.languages[lang], lang);
+                }
+                return code;
+            },
+            breaks: true,
+            gfm: true
+        });
+        
         this.setupEventListeners();
         this.testConnection();
         this.initializeKnowledgeManagement();
@@ -253,6 +265,8 @@ class ChatApp {
         try {
             this.addMessageToChat(message, 'user');
             
+            const thinkingDiv = this.showThinking();
+            
             const endpoint = this.useKnowledgeBase ? '/knowledge/query' : `/chat/${this.modelSelect.value}`;
             const response = await fetch(`${this.API_URL}${endpoint}`, {
                 method: 'POST',
@@ -264,6 +278,8 @@ class ChatApp {
                     role: this.modelSelect.value 
                 }),
             });
+
+            thinkingDiv.remove();
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -277,6 +293,42 @@ class ChatApp {
         } finally {
             this.isProcessing = false;
         }
+    }
+
+    showThinking() {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', 'assistant', 'thinking');
+        
+        // Add message header with icon
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'message-header';
+        
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'message-icon';
+        const icon = document.createElement('span');
+        icon.className = 'material-icons';
+        icon.textContent = 'smart_toy';
+        iconDiv.appendChild(icon);
+        headerDiv.appendChild(iconDiv);
+        
+        // Add thinking animation
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        const dotsDiv = document.createElement('div');
+        dotsDiv.className = 'thinking-dots';
+        for (let i = 0; i < 3; i++) {
+            const dot = document.createElement('span');
+            dotsDiv.appendChild(dot);
+        }
+        contentDiv.appendChild(dotsDiv);
+        
+        messageDiv.appendChild(headerDiv);
+        messageDiv.appendChild(contentDiv);
+        
+        this.chatMessages.appendChild(messageDiv);
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        
+        return messageDiv;
     }
 
     async translateText() {
@@ -380,19 +432,28 @@ class ChatApp {
         }
     }
 
+    cleanMarkdown(text) {
+        // Fix spacing issues in markdown
+        return text
+            // Remove space between parenthesis and bold/italic markers
+            .replace(/\) \*\*/g, ')**')
+            .replace(/\) \*/g, ')*')
+            // Remove space between bold/italic markers and parenthesis
+            .replace(/\*\* \(/g, '**(')
+            .replace(/\* \(/g, '*(')
+            // Fix other common spacing issues
+            .replace(/\*\* /g, '**')
+            .replace(/ \*\*/g, '**')
+            .replace(/\* /g, '*')
+            .replace(/ \*/g, '*');
+    }
+
     addMessageToChat(content, role) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', role);
         
         if (role === 'system') {
-            // Add success/error classes based on the message content
-            if (content.toLowerCase().includes('error')) {
-                messageDiv.classList.add('error');
-            } else if (content.toLowerCase().includes('success') || content.toLowerCase().includes('enabled') || content.toLowerCase().includes('disabled')) {
-                messageDiv.classList.add('success');
-            }
-            
-            // Add icon based on the message type
+            // Handle system messages as before
             const icon = document.createElement('span');
             icon.classList.add('material-icons');
             icon.style.fontSize = '14px';
@@ -408,11 +469,42 @@ class ChatApp {
             }
             
             messageDiv.appendChild(icon);
+            const textSpan = document.createElement('span');
+            textSpan.textContent = content;
+            messageDiv.appendChild(textSpan);
+        } else {
+            // Create message header with role icon
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'message-header';
+            
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'message-icon';
+            const icon = document.createElement('span');
+            icon.className = 'material-icons';
+            icon.textContent = role === 'user' ? 'person' : 'smart_toy';
+            iconDiv.appendChild(icon);
+            headerDiv.appendChild(iconDiv);
+            
+            // Add message content
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (role === 'assistant') {
+                // Clean and parse markdown for assistant messages
+                const cleanedContent = this.cleanMarkdown(content);
+                contentDiv.innerHTML = marked.parse(cleanedContent);
+                // Apply syntax highlighting to code blocks
+                contentDiv.querySelectorAll('pre code').forEach((block) => {
+                    Prism.highlightElement(block);
+                });
+            } else {
+                // Keep user messages as plain text
+                contentDiv.textContent = content;
+            }
+            
+            messageDiv.appendChild(headerDiv);
+            messageDiv.appendChild(contentDiv);
         }
-        
-        const textSpan = document.createElement('span');
-        textSpan.textContent = content;
-        messageDiv.appendChild(textSpan);
         
         this.chatMessages.appendChild(messageDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
