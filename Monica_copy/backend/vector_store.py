@@ -1,23 +1,26 @@
 import os
 import faiss
 import numpy as np
-from typing import List, Dict, Optional, Tuple
-from sentence_transformers import SentenceTransformer
-import pickle
 import json
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+from ollama_embeddings import OllamaEmbeddings
 
 class VectorStore:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        """Initialize the vector store with a sentence transformer model."""
-        self.model = SentenceTransformer(model_name)
-        self.dimension = self.model.get_sentence_embedding_dimension()
-        self.index = faiss.IndexFlatL2(self.dimension)
-        self.texts: List[str] = []
-        self.metadata: List[Dict] = []
-        self.store_path = os.path.join(os.path.dirname(__file__), "data")
-        os.makedirs(self.store_path, exist_ok=True)
-        
+    def __init__(self, model_name: str = "nomic-embed-text"):
+        """Initialize the vector store with Ollama embeddings model."""
+        try:
+            self.model = OllamaEmbeddings(model_name)
+            self.dimension = self.model.get_sentence_embedding_dimension()
+            self.index = faiss.IndexFlatL2(self.dimension)
+            self.texts: List[str] = []
+            self.metadata: List[Dict] = []
+            self.store_path = os.path.join(os.path.dirname(__file__), "data")
+            os.makedirs(self.store_path, exist_ok=True)
+        except Exception as e:
+            print(f"Error initializing VectorStore: {str(e)}")
+            raise
+            
     def add_documents(self, texts: List[str], metadata: Optional[List[Dict]] = None) -> None:
         """Add documents to the vector store with optional metadata."""
         if not texts:
@@ -56,19 +59,25 @@ class VectorStore:
         
         return results
     
-    def save(self, name: str = "default") -> None:
+    def save(self, name: str = "default") -> bool:
         """Save the vector store to disk."""
-        # Save FAISS index
-        index_path = os.path.join(self.store_path, f"{name}.faiss")
-        faiss.write_index(self.index, index_path)
-        
-        # Save documents and metadata
-        docs_path = os.path.join(self.store_path, f"{name}.json")
-        with open(docs_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                'texts': self.texts,
-                'metadata': self.metadata
-            }, f, ensure_ascii=False, indent=2)
+        try:
+            # Save FAISS index
+            index_path = os.path.join(self.store_path, f"{name}.faiss")
+            faiss.write_index(self.index, index_path)
+            
+            # Save documents and metadata
+            docs_path = os.path.join(self.store_path, f"{name}.json")
+            with open(docs_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'texts': self.texts,
+                    'metadata': self.metadata,
+                    'dimension': self.dimension
+                }, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Error saving vector store: {str(e)}")
+            return False
             
     def load(self, name: str = "default") -> bool:
         """Load the vector store from disk."""
@@ -76,22 +85,31 @@ class VectorStore:
         metadata_path = os.path.join(self.store_path, f"{name}.json")
         
         if not os.path.exists(index_path) or not os.path.exists(metadata_path):
-            # Initialize a new index if it doesn't exist
-            dimension = 384  # dimension for all-MiniLM-L6-v2
-            self.index = faiss.IndexFlatL2(dimension)
+            print(f"No existing vector store found at {index_path}")
+            self.index = faiss.IndexFlatL2(self.dimension)
             self.texts = []
             self.metadata = []
             return False
             
         try:
             self.index = faiss.read_index(index_path)
-            with open(metadata_path, 'r') as f:
+            if self.index.d != self.dimension:
+                print(f"Index dimension mismatch: stored={self.index.d}, current={self.dimension}")
+                self.index = faiss.IndexFlatL2(self.dimension)
+                self.texts = []
+                self.metadata = []
+                return False
+                
+            with open(metadata_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.texts = data['texts']
                 self.metadata = data['metadata']
             return True
         except Exception as e:
             print(f"Error loading vector store: {str(e)}")
+            self.index = faiss.IndexFlatL2(self.dimension)
+            self.texts = []
+            self.metadata = []
             return False
             
     def clear(self) -> None:
