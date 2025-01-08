@@ -1,24 +1,37 @@
 from typing import List, Dict, Optional
 from vector_store import VectorStore
 import os
-import uuid
-import datetime
 import logging
+import datetime
+from dotenv import load_dotenv
+import httpx
+from openai import OpenAI
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 class RAGManager:
     def __init__(self, vector_store_name: str = "default"):
-        """Initialize the RAG manager with a vector store."""
+        """Initialize RAG manager with vector store."""
         self.vector_store = VectorStore()
         self.vector_store_name = vector_store_name
         self.files = {}  # Store file metadata: {file_id: {name, size, chunks}}
-        self._load_or_create_store()
         
-    def _load_or_create_store(self) -> None:
-        """Load existing vector store or create a new one."""
-        if not self.vector_store.load(self.vector_store_name):
-            print(f"Creating new vector store: {self.vector_store_name}")
+        # Initialize OpenAI client
+        self.openai_client = OpenAI()
+        
+        # Initialize DeepSeek client for backup
+        deepseek_api_key = os.getenv("DeepSeek_API_KEY")
+        deepseek_base_url = os.getenv("DeepSeek_BASE_URL")
+        
+        if deepseek_api_key and deepseek_base_url:
+            self.deepseek_client = httpx.Client(
+                base_url=deepseek_base_url,
+                headers={"Authorization": f"Bearer {deepseek_api_key}"},
+                timeout=30.0
+            )
+        else:
+            self.deepseek_client = None
             
     def add_knowledge(self, texts: List[str], metadata: Optional[List[Dict]] = None) -> str:
         """Add new knowledge to the vector store and return the file ID."""
@@ -37,16 +50,22 @@ class RAGManager:
         self.vector_store.add_documents(texts, [
             {**meta, 'file_id': file_id} for meta in (metadata or [{}] * len(texts))
         ])
-        self.vector_store.save(self.vector_store_name)
         return file_id
+        
+    def has_knowledge(self) -> bool:
+        """Check if there is any knowledge in the vector store."""
+        return self.vector_store.has_documents()
         
     def query_knowledge(self, query: str, k: int = 5) -> List[Dict]:
         """Query the knowledge base."""
+        if not self.has_knowledge():
+            raise ValueError("Knowledge base is empty. Please add documents first.")
+            
         return self.vector_store.search(query, k)
         
-    def format_for_context(self, results: List[Dict]) -> str:
+    def _format_context(self, results: List[Dict]) -> str:
         """Format search results for adding to prompt context."""
-        context = "Relevant information from the knowledge base:\n\n"
+        context = "Here is the relevant information from the knowledge base:\n\n"
         for i, result in enumerate(results, 1):
             context += f"{i}. {result['text']}\n"
             if result['metadata'].get('source'):
@@ -54,22 +73,53 @@ class RAGManager:
             context += "\n"
         return context
         
-    def generate_rag_prompt(self, query: str, k: int = 5) -> str:
-        """Generate a prompt with relevant context for the query."""
+    def generate_response(self, query: str, k: int = 5) -> str:
+        """Generate a response using OpenAI or DeepSeek."""
+        if not self.has_knowledge():
+            raise ValueError("Cannot enable knowledge base: No files available. Please upload files first.")
+            
         results = self.query_knowledge(query, k)
-        context = self.format_for_context(results)
+        context = self._format_context(results)
         
-        prompt = f"""Based on the following context and the user's question, provide a comprehensive and accurate answer.
-If the context doesn't contain relevant information, acknowledge that and provide a general response.
+        system_prompt = """You are a helpful AI assistant. Answer questions based ONLY on the provided knowledge. 
+If you cannot find the answer in the provided information, say "I don't have enough information to answer that question."
+DO NOT make up or infer information that is not explicitly stated in the context.
 
-{context}
+Here is the relevant information:
+""" + context
 
-User's question: {query}
-
-Answer:"""
-        
-        return prompt
-        
+        try:
+            # Try OpenAI first
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ]
+            )
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.warning(f"OpenAI API error: {str(e)}, falling back to DeepSeek")
+            
+            # Fall back to DeepSeek if OpenAI fails
+            if self.deepseek_client:
+                try:
+                    response = self.deepseek_client.post("/v1/chat/completions", json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": query}
+                        ]
+                    })
+                    response.raise_for_status()
+                    return response.json()["choices"][0]["message"]["content"]
+                except Exception as e:
+                    logger.error(f"DeepSeek API error: {str(e)}")
+                    raise
+            else:
+                raise
+                
     def delete_file(self, file_id: str) -> bool:
         """Delete a file and its chunks from the vector store."""
         try:
@@ -79,9 +129,6 @@ Answer:"""
             # Remove documents with matching file_id
             self.vector_store.delete_by_metadata({'file_id': file_id})
             del self.files[file_id]
-            
-            # Save changes to disk
-            self.vector_store.save(self.vector_store_name)
             return True
             
         except Exception as e:
@@ -98,5 +145,4 @@ Answer:"""
     def clear_knowledge(self) -> None:
         """Clear all knowledge from the vector store."""
         self.vector_store.clear()
-        self.vector_store.save(self.vector_store_name)
         self.files = {}

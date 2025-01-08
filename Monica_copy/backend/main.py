@@ -10,18 +10,29 @@ import os
 import httpx
 import logging
 import json
-import re
 from rag_utils import RAGManager
 import PyPDF2
 from io import BytesIO
 import docx
 import chardet
+import datetime
+import re
 
-# Configure logging
+# Configure logging with more detailed format
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,  # Set to DEBUG level to see all messages
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Output to console
+        logging.FileHandler('app.log')  # Also save to file
+    ]
 )
+
+# Set debug level for specific loggers
+logging.getLogger('rag_utils').setLevel(logging.DEBUG)
+logging.getLogger('vector_store').setLevel(logging.DEBUG)
+logging.getLogger('ollama_embeddings').setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -536,88 +547,40 @@ async def add_knowledge(knowledge: KnowledgeBase):
 @app.post("/knowledge/query")
 async def query_knowledge(message: Message):
     """Query the knowledge base and get a response using RAG."""
-    print("Query the knowledge base and get a response using RAG.\n\n")
     try:
         if not message.content:
             return JSONResponse(
                 status_code=400,
-                content={"content": "Please provide a question to search the knowledge base."}
+                content={"error": "Please provide a question to search the knowledge base."}
             )
-        
-        # Get search results
-        results = rag_manager.query_knowledge(message.content)
-        
-        # Format context with reference numbers
-        context = "Relevant information from the knowledge base:\n\n"
-        for i, result in enumerate(results, 1):
-            context += f"[{i}] {result['text']}\n"
-            if result['metadata'].get('source'):
-                context += f"    Source: {result['metadata']['source']}\n"
-            context += "\n"
-        
-        # Create prompt with instructions to use reference numbers
-        prompt = f"""Based on the following context and the user's question, provide a comprehensive and accurate answer.
-Use reference numbers [1], [2], etc. when citing information from the context. Make sure to cite your sources.
-If the context doesn't contain relevant information, acknowledge that and provide a general response.
-
-{context}
-
-User's question: {message.content}
-
-Answer:"""
-        
-        # Get the appropriate model client
-        if message.role == "kimi":
-            if not kimi_client:
-                raise HTTPException(status_code=503, detail="KIMI service not available")
-            client = kimi_client
-            model_name = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
-        elif message.role == "deepseek":
-            if not deepseek_client:
-                raise HTTPException(status_code=503, detail="Deepseek service not available")
-            client = deepseek_client
-            model_name = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-        else:
-            if not gpt_client:
-                raise HTTPException(status_code=503, detail="GPT-4 service not available")
-            client = gpt_client
-            model_name = "gpt-4"
-        
-        # Get response from the model
-        chat_completion = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant. Use the provided context to answer questions accurately. When referring to information from the context, use reference numbers [1], [2], etc."
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7
-        )
-        
-        response_content = chat_completion.choices[0].message.content
-        
-        # Format sources for frontend display
-        sources = []
-        for i, result in enumerate(results, 1):
-            sources.append({
-                "id": i,
-                "text": result['text'][:200] + "...",  # Truncate long texts
-                "source": result['metadata'].get('source', 'Unknown')
+            
+        try:
+            # Check if knowledge base is enabled
+            if not rag_manager.has_knowledge():
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Cannot enable knowledge base: No files available. Please upload files first."}
+                )
+                
+            # Get response from RAG
+            response = rag_manager.generate_response(message.content)
+            
+            return JSONResponse(content={
+                "content": response,
+                "type": "text"
             })
-        
-        return JSONResponse(content={
-            "content": response_content,
-            "type": "text",
-            "sources": sources
-        })
-        
+            
+        except ValueError as e:
+            return JSONResponse(
+                status_code=400,
+                content={"error": str(e)}
+            )
+            
     except Exception as e:
-        logger.error(f"Error querying knowledge base: {str(e)}")
+        logger.error(f"Error querying knowledge base: {str(e)}", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"content": f"Error querying knowledge base: {str(e)}"}
+            content={"error": f"Error querying knowledge base: {str(e)}"}
         )
 
 @app.post("/knowledge/clear")
@@ -662,43 +625,72 @@ async def upload_files(files: List[UploadFile] = File(...)):
     try:
         results = []
         for file in files:
+            logger.info(f"Processing file: {file.filename}")
             content = await file.read()
             file_ext = os.path.splitext(file.filename)[1].lower()
             
             # Extract text based on file type
-            if file_ext == '.pdf':
-                text = extract_text_from_pdf(content)
-            elif file_ext == '.docx':
-                text = extract_text_from_docx(content)
-            elif file_ext == '.txt':
-                text = extract_text_from_txt(content)
-            else:
-                logger.warning(f"Skipping unsupported file: {file.filename}")
+            try:
+                if file_ext == '.pdf':
+                    text = extract_text_from_pdf(content)
+                elif file_ext == '.docx':
+                    text = extract_text_from_docx(content)
+                elif file_ext == '.txt':
+                    text = extract_text_from_txt(content)
+                else:
+                    logger.warning(f"Skipping unsupported file type: {file_ext} for file: {file.filename}")
+                    continue
+                    
+                if not text.strip():
+                    logger.warning(f"No text content extracted from file: {file.filename}")
+                    continue
+                    
+                logger.info(f"Successfully extracted text from {file.filename}")
+                
+            except Exception as e:
+                logger.error(f"Error extracting text from {file.filename}: {str(e)}")
                 continue
                 
-            # Split text into chunks
-            chunks = text.split('\n\n')
-            chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+            # Create metadata for the file
+            metadata = {
+                'source': file.filename,
+                'type': file_ext[1:],  # Remove the dot
+                'timestamp': datetime.datetime.now().isoformat()
+            }
             
-            # Add to knowledge base with metadata
-            file_id = rag_manager.add_knowledge(
-                chunks,
-                [{'source': file.filename}] * len(chunks)
+            try:
+                # Add to knowledge base with metadata
+                file_id = rag_manager.add_knowledge(
+                    [text],  # Pass as a single document
+                    [metadata]  # Pass metadata for the document
+                )
+                
+                logger.info(f"Successfully added {file.filename} to knowledge base with ID: {file_id}")
+                
+                results.append({
+                    "filename": file.filename,
+                    "file_id": file_id,
+                    "type": file_ext[1:],
+                    "timestamp": metadata['timestamp']
+                })
+                
+            except Exception as e:
+                logger.error(f"Error adding {file.filename} to knowledge base: {str(e)}")
+                continue
+        
+        if not results:
+            return JSONResponse(
+                status_code=400,
+                content={"message": "No files were successfully processed"}
             )
             
-            results.append({
-                "filename": file.filename,
-                "file_id": file_id,
-                "chunks": len(chunks)
-            })
-        
         return JSONResponse(content={
             "message": f"Successfully uploaded {len(results)} files",
             "files": results
         })
         
     except Exception as e:
-        logger.error(f"Error uploading files: {str(e)}")
+        logger.error(f"Error in upload_files: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error uploading files: {str(e)}")
 
 if __name__ == "__main__":

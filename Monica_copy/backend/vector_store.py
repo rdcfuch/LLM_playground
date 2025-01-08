@@ -1,168 +1,136 @@
 import os
-import faiss
-import numpy as np
-import json
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime
-from ollama_embeddings import OllamaEmbeddings
+import chromadb
+import logging
+import shutil
+from typing import List, Dict, Optional
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+logger = logging.getLogger(__name__)
 
 class VectorStore:
-    def __init__(self, model_name: str = "nomic-embed-text"):
-        """Initialize the vector store with Ollama embeddings model."""
-        try:
-            self.model = OllamaEmbeddings(model_name)
-            self.dimension = self.model.get_sentence_embedding_dimension()
-            self.index = faiss.IndexFlatL2(self.dimension)
-            self.texts: List[str] = []
-            self.metadata: List[Dict] = []
-            self.store_path = os.path.join(os.path.dirname(__file__), "data")
-            os.makedirs(self.store_path, exist_ok=True)
-        except Exception as e:
-            print(f"Error initializing VectorStore: {str(e)}")
-            raise
+    def __init__(self, persist_directory: str = None, collection_name: str = "document_store"):
+        """Initialize the vector store with ChromaDB."""
+        if persist_directory is None:
+            persist_directory = os.path.join(os.path.dirname(__file__), "data", "chroma")
             
+        # Remove existing directory if it exists to avoid schema issues
+        if os.path.exists(persist_directory):
+            shutil.rmtree(persist_directory)
+            
+        # Create the persist directory
+        os.makedirs(persist_directory, exist_ok=True)
+        
+        # Initialize ChromaDB client with persistent storage
+        self.client = chromadb.PersistentClient(path=persist_directory)
+        
+        # Create collection with basic settings
+        self.collection = self.client.create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
+        
+        # Initialize text splitter
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=300,
+            chunk_overlap=100,
+            length_function=len,
+            is_separator_regex=False,
+        )
+
+    def load_pdf_directory(self, directory_path: str) -> None:
+        """Load and process all PDFs from a directory."""
+        # Load PDFs
+        loader = PyPDFDirectoryLoader(directory_path)
+        documents = loader.load()
+        
+        # Split documents
+        chunks = self.text_splitter.split_documents(documents)
+        
+        # Prepare for ChromaDB
+        texts = []
+        metadatas = []
+        ids = []
+        
+        for i, chunk in enumerate(chunks):
+            texts.append(chunk.page_content)
+            metadatas.append(chunk.metadata)
+            ids.append(f"doc_{i}")
+            
+        # Add to ChromaDB
+        if texts:  # Only add if there are documents
+            self.collection.add(
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+
     def add_documents(self, texts: List[str], metadata: Optional[List[Dict]] = None) -> None:
-        """Add documents to the vector store with optional metadata."""
+        """Add documents to the vector store."""
         if not texts:
             return
             
-        # Create embeddings for the texts
-        embeddings = self.model.encode(texts)
+        # Split texts into chunks
+        chunks = []
+        for text in texts:
+            chunks.extend(self.text_splitter.split_text(text))
+            
+        # Generate IDs for chunks
+        ids = [f"doc_{i}" for i in range(len(chunks))]
         
-        # Add embeddings to FAISS index
-        self.index.add(np.array(embeddings).astype('float32'))
-        
-        # Store documents with metadata
+        # If no metadata provided, create empty metadata for each chunk
         if metadata is None:
-            metadata = [{"timestamp": datetime.now().isoformat()} for _ in texts]
+            metadata = [{} for _ in chunks]
+        else:
+            # Replicate metadata for chunks
+            expanded_metadata = []
+            for i, meta in enumerate(metadata):
+                chunk_count = len(self.text_splitter.split_text(texts[i]))
+                expanded_metadata.extend([meta.copy() for _ in range(chunk_count)])
+            metadata = expanded_metadata
+            
+        # Add to ChromaDB
+        if chunks:  # Only add if there are chunks
+            self.collection.add(
+                documents=chunks,
+                metadatas=metadata,
+                ids=ids
+            )
         
-        self.texts.extend(texts)
-        self.metadata.extend(metadata)
-    
-    def search(self, query: str, k: int = 5) -> List[Dict]:
-        """Search for similar documents using the query."""
-        # Create query embedding
-        query_embedding = self.model.encode([query])
-        
-        # Search in FAISS index
-        distances, indices = self.index.search(np.array(query_embedding).astype('float32'), k)
-        
-        # Get the matching documents
-        results = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.texts):  # Ensure the index is valid
-                results.append({
-                    "text": self.texts[idx],
-                    "metadata": self.metadata[idx],
-                    "score": float(distances[0][i]),  # Convert numpy float to Python float
-                })
-        
-        return results
-    
-    def save(self, name: str = "default") -> bool:
-        """Save the vector store to disk."""
+    def has_documents(self) -> bool:
+        """Check if the collection has any documents."""
         try:
-            # Save FAISS index
-            index_path = os.path.join(self.store_path, f"{name}.faiss")
-            faiss.write_index(self.index, index_path)
-            
-            # Save documents and metadata
-            docs_path = os.path.join(self.store_path, f"{name}.json")
-            with open(docs_path, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'texts': self.texts,
-                    'metadata': self.metadata,
-                    'dimension': self.dimension
-                }, f, ensure_ascii=False, indent=2)
-            return True
+            # Try to get one document to check if collection is empty
+            result = self.collection.query(
+                query_texts=["test"],
+                n_results=1
+            )
+            return len(result['ids'][0]) > 0
         except Exception as e:
-            print(f"Error saving vector store: {str(e)}")
+            logger.error(f"Error checking documents: {str(e)}")
             return False
             
-    def load(self, name: str = "default") -> bool:
-        """Load the vector store from disk."""
-        index_path = os.path.join(self.store_path, f"{name}.faiss")
-        metadata_path = os.path.join(self.store_path, f"{name}.json")
+    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Search for documents similar to the query."""
+        if not self.has_documents():
+            raise ValueError("No documents found in the collection. Please add documents first.")
+            
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=top_k
+        )
         
-        if not os.path.exists(index_path) or not os.path.exists(metadata_path):
-            print(f"No existing vector store found at {index_path}")
-            self.index = faiss.IndexFlatL2(self.dimension)
-            self.texts = []
-            self.metadata = []
-            return False
+        # Format results
+        formatted_results = []
+        for i in range(len(results['ids'][0])):
+            formatted_results.append({
+                'id': results['ids'][0][i],
+                'text': results['documents'][0][i],
+                'metadata': results['metadatas'][0][i]
+            })
             
-        try:
-            self.index = faiss.read_index(index_path)
-            if self.index.d != self.dimension:
-                print(f"Index dimension mismatch: stored={self.index.d}, current={self.dimension}")
-                self.index = faiss.IndexFlatL2(self.dimension)
-                self.texts = []
-                self.metadata = []
-                return False
-                
-            with open(metadata_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                self.texts = data['texts']
-                self.metadata = data['metadata']
-            return True
-        except Exception as e:
-            print(f"Error loading vector store: {str(e)}")
-            self.index = faiss.IndexFlatL2(self.dimension)
-            self.texts = []
-            self.metadata = []
-            return False
-            
-    def clear(self) -> None:
-        """Clear the vector store."""
-        self.index = faiss.IndexFlatL2(self.dimension)
-        self.texts = []
-        self.metadata = []
-        
-    def get_document_by_id(self, doc_id: int) -> Optional[Dict]:
-        """Retrieve a document by its ID."""
-        for i, text in enumerate(self.texts):
-            if i == doc_id:
-                return {
-                    "text": text,
-                    "metadata": self.metadata[i],
-                }
-        return None
+        return formatted_results
 
-    def delete_by_metadata(self, filter_dict: Dict) -> None:
-        """Delete documents that match the metadata filter."""
-        if not self.texts:
-            return
-            
-        # Find indices to keep
-        indices_to_keep = []
-        new_texts = []
-        new_metadata = []
-        
-        for i, meta in enumerate(self.metadata):
-            keep = True  # Default to keeping the document
-            for key, value in filter_dict.items():
-                if key in meta and meta[key] == value:
-                    keep = False  # Don't keep if it matches the filter
-                    break
-            
-            if keep:
-                indices_to_keep.append(i)
-                new_texts.append(self.texts[i])
-                new_metadata.append(self.metadata[i])
-        
-        if not indices_to_keep:
-            # If no documents remain, clear everything
-            self.clear()
-            return
-            
-        # Create new index with kept documents
-        new_index = faiss.IndexFlatL2(self.dimension)
-        if indices_to_keep:
-            # Get embeddings for kept documents
-            embeddings = self.model.encode(new_texts)
-            new_index.add(np.array(embeddings).astype('float32'))
-        
-        # Update instance variables
-        self.index = new_index
-        self.texts = new_texts
-        self.metadata = new_metadata
+    def clear(self) -> None:
+        """Clear all documents from the collection."""
+        self.collection.delete()
