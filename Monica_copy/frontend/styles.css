@@ -711,114 +711,82 @@ input:checked + .slider:before {
 }
 
 .file-list {
-    margin-bottom: 20px;
+    max-height: 400px;
+    overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    max-height: 300px;
-    overflow-y: auto;
+    padding: 8px;
+}
+
+.empty-message {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 20px;
+    font-style: italic;
 }
 
 .file-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 12px;
     border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
 }
 
 .file-item:last-child {
     border-bottom: none;
 }
 
+.file-item:hover {
+    background-color: var(--bg-primary);
+}
+
 .file-info {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 1;
+}
+
+.file-type-icon {
+    color: var(--primary-color);
+    font-size: 24px;
 }
 
 .file-name {
-    font-size: 0.9rem;
+    font-weight: 500;
     color: var(--text-color);
 }
 
-.file-meta {
-    font-size: 0.8rem;
-    color: #666;
+.file-details {
+    color: var(--text-secondary);
+    font-size: 0.9em;
 }
 
-.file-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.file-actions button {
+.delete-btn {
     background: none;
     border: none;
+    color: var(--text-secondary);
     cursor: pointer;
-    color: var(--text-color);
-    opacity: 0.7;
-    transition: opacity 0.2s;
     padding: 4px;
-}
-
-.file-actions button:hover {
-    opacity: 1;
-}
-
-.upload-section {
-    display: flex;
-    justify-content: center;
-    padding: 16px;
-}
-
-.primary-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.primary-btn:hover {
-    background-color: var(--hover-color);
-}
-
-.primary-btn .material-icons {
-    font-size: 20px;
-}
-
-.upload-progress {
-    margin: 16px 0;
-    padding: 12px;
-    background-color: var(--secondary-color);
-    border-radius: 8px;
-}
-
-.progress-container {
-    width: 100%;
-    background-color: #f0f0f0;
     border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.delete-btn:hover {
+    background-color: #ffebee;
+    color: #f44336;
+}
+
+#upload-progress {
+    display: none;
     margin: 10px 0;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 8px;
-    background-color: #2196F3;
-    width: 0;
-    transition: width 0.5s ease-out, background-color 0.3s ease;
-}
-
-.progress-text {
-    font-size: 14px;
-    color: #666;
-    margin: 5px 0;
-    font-family: monospace;  /* For better alignment of ASCII progress bar */
+    padding: 8px;
+    background-color: var(--bg-primary);
+    border-radius: 4px;
+    text-align: center;
+    color: var(--text-secondary);
 }
 
 /* Knowledge Base Modal */
@@ -1053,4 +1021,52 @@ input:checked + .slider:before {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+.primary-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+}
+
+.primary-btn:hover {
+    background-color: #1976D2;
+    box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+    transform: translateY(-1px);
+}
+
+.primary-btn:active {
+    background-color: #1565C0;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+    transform: translateY(0);
+}
+
+.primary-btn .material-icons {
+    font-size: 20px;
+}
+
+.primary-btn:disabled {
+    background-color: #BDBDBD;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+.primary-btn:hover .material-icons {
+    animation: bounce 0.5s ease infinite;
 }

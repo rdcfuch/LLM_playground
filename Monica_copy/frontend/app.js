@@ -14,6 +14,9 @@ class ChatApp {
         this.kbFileInput = document.getElementById('kb-file-input');
         this.kbUploadBtn = document.getElementById('kb-upload-btn');
         
+        // Set accepted file types
+        this.kbFileInput.accept = '.txt';
+        
         // Initialize state
         this.isProcessing = false;
         this.useKnowledgeBase = false;
@@ -138,7 +141,10 @@ class ChatApp {
                     await this.loadKnowledgeFiles();
                     this.kbToggle.checked = true;
                     this.useKnowledgeBase = true;
-                    this.addMessageToChat(`${data.message} (${data.files.map(f => f.filename).join(', ')})`, 'system');
+                    
+                    // Show success message with file names
+                    const fileNames = data.files.map(f => f.name || f.filename).join(', ');
+                    this.addMessageToChat(`Successfully uploaded: ${fileNames}`, 'system');
                 } catch (error) {
                     console.error('Error uploading files:', error);
                     this.addMessageToChat(`Error uploading files: ${error.message}`, 'system');
@@ -171,7 +177,7 @@ class ChatApp {
     renderFileList(files) {
         this.fileList.innerHTML = '';
         
-        if (files.length === 0) {
+        if (!files || files.length === 0) {
             const emptyMessage = document.createElement('div');
             emptyMessage.className = 'empty-message';
             emptyMessage.textContent = 'No files in knowledge base';
@@ -186,19 +192,29 @@ class ChatApp {
             const fileInfo = document.createElement('div');
             fileInfo.className = 'file-info';
             
+            const fileTypeIcon = document.createElement('span');
+            fileTypeIcon.className = 'material-icons file-type-icon';
+            fileTypeIcon.textContent = 'description';  // Text file icon
+            
             const fileName = document.createElement('div');
             fileName.className = 'file-name';
-            fileName.textContent = file.name;
+            fileName.textContent = file.name || 'Unnamed file';
             
             const fileDetails = document.createElement('div');
             fileDetails.className = 'file-details';
-            fileDetails.textContent = `${this.formatFileSize(file.size)} · ${this.formatDate(file.added)}`;
+            const details = [];
+            if (file.size) details.push(this.formatFileSize(file.size));
+            if (file.added) details.push(this.formatDate(file.added));
+            if (file.type) details.push(file.type.toUpperCase());
+            if (file.chunks) details.push(`${file.chunks} chunks`);
+            fileDetails.textContent = details.join(' · ');
             
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.innerHTML = '<span class="material-icons">delete</span>';
             deleteBtn.onclick = () => this.deleteFile(file.id);
             
+            fileInfo.appendChild(fileTypeIcon);
             fileInfo.appendChild(fileName);
             fileInfo.appendChild(fileDetails);
             fileItem.appendChild(fileInfo);
@@ -231,7 +247,7 @@ class ChatApp {
         progressDiv.style.display = 'block';
         
         try {
-            const response = await fetch(`${this.API_URL}/knowledge/delete/${fileId}`, {
+            const response = await fetch(`${this.API_URL}/knowledge/files/${fileId}`, {
                 method: 'DELETE'
             });
             

@@ -100,9 +100,7 @@ Here is the relevant information:
             return response.choices[0].message.content
             
         except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            
-            # Fall back to DeepSeek if available
+            logger.error(f"Error with OpenAI: {str(e)}")
             if self.deepseek_client:
                 try:
                     response = self.deepseek_client.post("/v1/chat/completions", json={
@@ -113,34 +111,45 @@ Here is the relevant information:
                         ]
                     })
                     response.raise_for_status()
-                    return response.json()["choices"][0]["message"]["content"]
+                    return response.json()['choices'][0]['message']['content']
                 except Exception as e:
-                    logger.error(f"DeepSeek API error: {e}")
+                    logger.error(f"Error with DeepSeek: {str(e)}")
                     raise
             else:
                 raise
                 
     def delete_file(self, file_id: str) -> bool:
-        """Delete a file and its chunks from the vector store."""
+        """Delete a file and its associated documents from the knowledge base."""
         try:
             if file_id not in self.files:
+                logger.warning(f"File {file_id} not found in metadata")
                 return False
                 
-            # Remove documents with matching file_id
+            # Delete documents from vector store
             self.vector_store.delete_by_metadata({'file_id': file_id})
+            
+            # Remove file metadata
             del self.files[file_id]
+            logger.info(f"Successfully deleted file {file_id} and its metadata")
             return True
             
         except Exception as e:
-            logger.error(f"Error in delete_file: {str(e)}", exc_info=True)
+            logger.error(f"Error deleting file {file_id}: {e}")
             raise
             
     def list_files(self) -> List[Dict]:
-        """List all files in the knowledge base."""
-        return [
-            {'id': file_id, **file_info}
-            for file_id, file_info in self.files.items()
-        ]
+        """List all files in the knowledge base with their metadata."""
+        files_list = []
+        for file_id, metadata in self.files.items():
+            files_list.append({
+                'id': file_id,
+                'name': metadata['name'],
+                'size': metadata['size'],
+                'added': metadata['added'],
+                'type': 'txt',  # Since we only support text files for now
+                'chunks': metadata['chunks']
+            })
+        return sorted(files_list, key=lambda x: x['added'], reverse=True)  # Most recent first
         
     def clear_knowledge(self) -> None:
         """Clear all knowledge from the vector store."""
