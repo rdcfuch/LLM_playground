@@ -18,7 +18,7 @@ deepseek_client = OpenAI(
 )
 
 # Initialize Milvus
-milvus_client = MilvusClient(uri="./milvus_demo.db")
+milvus_client = MilvusClient(uri="./Deepseek_RAG/milvus_demo.db")
 collection_name = "web_summaries"
 
 # Prepare Embedding Model
@@ -47,7 +47,7 @@ def insert_data_to_milvus(documents):
 
 # Summarize Function
 def summarize_page(text):
-    summary = deepseek_client.completions.create(
+    summary = deepseek_client.chat.completions.create(
         model=DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": "You are an AI summarizer."},
@@ -86,7 +86,7 @@ def main():
     # Step 3: RAG Query
     question = "What is the main idea?"
     context = retrieve_context(question)
-    answer = deepseek_client.completions.create(
+    answer = deepseek_client.chat.completions.create(
         model=DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": "Use context to answer questions."},
