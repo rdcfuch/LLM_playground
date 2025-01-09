@@ -12,19 +12,28 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     def __init__(self, collection_name: str = "document_store"):
         """Initialize the vector store with Milvus."""
-        # Initialize Milvus connection
+        # Initialize Milvus connection with persistence configuration
         try:
             connections.connect(
                 alias="default",
                 host="localhost",
-                port="19530"
+                port="19530",
+                # Add persistence configuration
+                db_name="default",
+                user="root",
+                password="milvus",
+                enable_persistent=True,
+                persistent_path="/var/lib/milvus"  # Default Milvus data path
             )
             logger.info("Successfully connected to Milvus")
         except Exception as e:
             logger.error(f"Failed to connect to Milvus: {e}")
             raise
             
-        self.client = MilvusClient(uri="http://localhost:19530")
+        self.client = MilvusClient(
+            uri="http://localhost:19530",
+            token="root:milvus"  # Add authentication
+        )
         self.collection_name = collection_name
         
         # Initialize OpenAI client for embeddings
@@ -40,6 +49,9 @@ class VectorStore:
 
         # Initialize embedding model
         self.embedding_model = milvus_model.DefaultEmbeddingFunction()
+        
+        # Ensure collection exists and is properly configured
+        self.ensure_collection_exists()
 
     def __del__(self):
         """Cleanup Milvus connection when object is destroyed."""
@@ -55,13 +67,15 @@ class VectorStore:
             # Check if collection exists
             if self.client.describe_collection(self.collection_name):
                 logger.info(f"Collection {self.collection_name} already exists")
+                # Load the collection to ensure it's ready for operations
+                self.client.load_collection(self.collection_name)
                 return
                 
             # Get dimension from embedding model
             test_dim = len(self.embedding_model.encode_queries(["test"])[0])
             logger.info(f"Creating collection with dimension {test_dim}")
             
-            # Create collection schema
+            # Create collection schema with persistence settings
             schema = {
                 "fields": [
                     {
@@ -99,18 +113,34 @@ class VectorStore:
                         "name": "file_id",
                         "dtype": "VarChar",
                         "description": "File identifier",
-                        "max_length": 36
+                        "max_length": 255
                     }
                 ],
-                "description": "Document store for text embeddings"
+                "enable_dynamic_field": True
             }
             
-            # Create collection
+            # Create collection with persistence configuration
             self.client.create_collection(
                 collection_name=self.collection_name,
-                schema=schema
+                schema=schema,
+                consistency_level="Strong"  # Ensure strong consistency
             )
-            logger.info(f"Created collection {self.collection_name}")
+            
+            # Create index for vector field
+            index_params = {
+                "metric_type": "L2",
+                "index_type": "IVF_FLAT",
+                "params": {"nlist": 1024}
+            }
+            self.client.create_index(
+                collection_name=self.collection_name,
+                field_name="vector",
+                index_params=index_params
+            )
+            
+            # Load collection into memory
+            self.client.load_collection(self.collection_name)
+            logger.info(f"Successfully created and loaded collection {self.collection_name}")
             
         except Exception as e:
             logger.error(f"Error ensuring collection exists: {e}")
