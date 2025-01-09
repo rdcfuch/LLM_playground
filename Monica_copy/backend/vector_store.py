@@ -1,34 +1,34 @@
 import os
-import chromadb
 import logging
-import shutil
 from typing import List, Dict, Optional
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pymilvus import connections, MilvusClient, utility, model as milvus_model
+from tqdm import tqdm
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 class VectorStore:
-    def __init__(self, persist_directory: str = None, collection_name: str = "document_store"):
-        """Initialize the vector store with ChromaDB."""
-        if persist_directory is None:
-            persist_directory = os.path.join(os.path.dirname(__file__), "data", "chroma")
+    def __init__(self, collection_name: str = "document_store"):
+        """Initialize the vector store with Milvus."""
+        # Initialize Milvus connection
+        try:
+            connections.connect(
+                alias="default",
+                host="localhost",
+                port="19530"
+            )
+            logger.info("Successfully connected to Milvus")
+        except Exception as e:
+            logger.error(f"Failed to connect to Milvus: {e}")
+            raise
             
-        # Remove existing directory if it exists to avoid schema issues
-        if os.path.exists(persist_directory):
-            shutil.rmtree(persist_directory)
-            
-        # Create the persist directory
-        os.makedirs(persist_directory, exist_ok=True)
+        self.client = MilvusClient(uri="http://localhost:19530")
+        self.collection_name = collection_name
         
-        # Initialize ChromaDB client with persistent storage
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        
-        # Create collection with basic settings
-        self.collection = self.client.create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"}
-        )
+        # Initialize OpenAI client for embeddings
+        self.openai_client = OpenAI()
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -38,99 +38,120 @@ class VectorStore:
             is_separator_regex=False,
         )
 
-    def load_pdf_directory(self, directory_path: str) -> None:
-        """Load and process all PDFs from a directory."""
-        # Load PDFs
-        loader = PyPDFDirectoryLoader(directory_path)
-        documents = loader.load()
-        
-        # Split documents
-        chunks = self.text_splitter.split_documents(documents)
-        
-        # Prepare for ChromaDB
-        texts = []
-        metadatas = []
-        ids = []
-        
-        for i, chunk in enumerate(chunks):
-            texts.append(chunk.page_content)
-            metadatas.append(chunk.metadata)
-            ids.append(f"doc_{i}")
+        # Initialize embedding model
+        self.embedding_model = milvus_model.DefaultEmbeddingFunction()
+
+    def __del__(self):
+        """Cleanup Milvus connection when object is destroyed."""
+        try:
+            connections.disconnect("default")
+            logger.info("Successfully disconnected from Milvus")
+        except Exception as e:
+            logger.error(f"Error disconnecting from Milvus: {e}")
+
+    def ensure_collection_exists(self):
+        """Ensure collection exists and is properly initialized."""
+        try:
+            # Drop existing collection if it exists
+            if self.client.has_collection(self.collection_name):
+                logger.info(f"Dropping existing collection {self.collection_name}")
+                self.client.drop_collection(self.collection_name)
+                
+            # Get dimension from embedding model
+            test_dim = len(self.embedding_model.encode_queries(["test"])[0])
+            logger.info(f"Creating collection with dimension {test_dim}")
             
-        # Add to ChromaDB
-        if texts:  # Only add if there are documents
-            self.collection.add(
-                documents=texts,
-                metadatas=metadatas,
-                ids=ids
+            # Create collection
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                dimension=test_dim,
+                metric_type="IP",
+                consistency_level="Strong"
             )
+            logger.info(f"Created collection {self.collection_name}")
+            
+        except Exception as e:
+            logger.error(f"Error ensuring collection exists: {e}")
+            raise
 
     def add_documents(self, texts: List[str], metadata: Optional[List[Dict]] = None) -> None:
         """Add documents to the vector store."""
         if not texts:
             return
             
+        # Ensure collection exists
+        self.ensure_collection_exists()
+            
         # Split texts into chunks
         chunks = []
         for text in texts:
             chunks.extend(self.text_splitter.split_text(text))
             
-        # Generate IDs for chunks
-        ids = [f"doc_{i}" for i in range(len(chunks))]
-        
-        # If no metadata provided, create empty metadata for each chunk
-        if metadata is None:
-            metadata = [{} for _ in chunks]
-        else:
-            # Replicate metadata for chunks
-            expanded_metadata = []
-            for i, meta in enumerate(metadata):
-                chunk_count = len(self.text_splitter.split_text(texts[i]))
-                expanded_metadata.extend([meta.copy() for _ in range(chunk_count)])
-            metadata = expanded_metadata
+        try:
+            # Get embeddings using embedding model
+            embeddings = self.embedding_model.encode_queries(chunks)
+            logger.info(f"Created embeddings for {len(chunks)} chunks")
             
-        # Add to ChromaDB
-        if chunks:  # Only add if there are chunks
-            self.collection.add(
-                documents=chunks,
-                metadatas=metadata,
-                ids=ids
+            # Prepare data for insertion
+            data = []
+            for i, (text, embedding) in enumerate(zip(chunks, embeddings)):
+                data.append({
+                    'id': i,
+                    'text': text,
+                    'vector': embedding  # Embedding model already returns a list
+                })
+            
+            # Insert into Milvus
+            logger.info(f"Inserting {len(data)} documents into Milvus")
+            self.client.insert(
+                collection_name=self.collection_name,
+                data=data
             )
+            logger.info(f"Successfully inserted {len(data)} documents")
+            
+        except Exception as e:
+            logger.error(f"Error inserting documents: {e}")
+            raise
+
+    def search(self, query: str, k: int = 5) -> List[Dict]:
+        """Search for similar documents."""
+        # Ensure collection exists
+        self.ensure_collection_exists()
         
+        try:
+            # Get query embedding using embedding model
+            query_embedding = self.embedding_model.encode_queries([query])[0]
+            
+            # Search in Milvus
+            results = self.client.search(
+                collection_name=self.collection_name,
+                data=[query_embedding],
+                anns_field="vector",
+                param={"metric_type": "IP", "params": {"nprobe": 10}},
+                limit=k,
+                output_fields=["text"]
+            )
+            
+            # Format results
+            formatted_results = []
+            for hit in results[0]:
+                formatted_results.append({
+                    "text": hit.entity.get("text"),
+                    "metadata": {},
+                    "score": float(hit.score)
+                })
+                
+            return formatted_results
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            raise
+
     def has_documents(self) -> bool:
         """Check if the collection has any documents."""
         try:
-            # Try to get one document to check if collection is empty
-            result = self.collection.query(
-                query_texts=["test"],
-                n_results=1
-            )
-            return len(result['ids'][0]) > 0
+            if not self.client.has_collection(self.collection_name):
+                return False
+            return self.client.get_collection_stats(self.collection_name)["row_count"] > 0
         except Exception as e:
-            logger.error(f"Error checking documents: {str(e)}")
+            logger.error(f"Error checking for documents: {e}")
             return False
-            
-    def search(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Search for documents similar to the query."""
-        if not self.has_documents():
-            raise ValueError("No documents found in the collection. Please add documents first.")
-            
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k
-        )
-        
-        # Format results
-        formatted_results = []
-        for i in range(len(results['ids'][0])):
-            formatted_results.append({
-                'id': results['ids'][0][i],
-                'text': results['documents'][0][i],
-                'metadata': results['metadatas'][0][i]
-            })
-            
-        return formatted_results
-
-    def clear(self) -> None:
-        """Clear all documents from the collection."""
-        self.collection.delete()

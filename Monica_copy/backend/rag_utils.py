@@ -11,10 +11,10 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 class RAGManager:
-    def __init__(self, vector_store_name: str = "default"):
+    def __init__(self, collection_name: str = "document_store"):
         """Initialize RAG manager with vector store."""
-        self.vector_store = VectorStore()
-        self.vector_store_name = vector_store_name
+        self.vector_store = VectorStore(collection_name=collection_name)
+        self.collection_name = collection_name
         self.files = {}  # Store file metadata: {file_id: {name, size, chunks}}
         
         # Initialize OpenAI client
@@ -100,9 +100,9 @@ Here is the relevant information:
             return response.choices[0].message.content
             
         except Exception as e:
-            logger.warning(f"OpenAI API error: {str(e)}, falling back to DeepSeek")
+            logger.error(f"OpenAI API error: {e}")
             
-            # Fall back to DeepSeek if OpenAI fails
+            # Fall back to DeepSeek if available
             if self.deepseek_client:
                 try:
                     response = self.deepseek_client.post("/v1/chat/completions", json={
@@ -115,7 +115,7 @@ Here is the relevant information:
                     response.raise_for_status()
                     return response.json()["choices"][0]["message"]["content"]
                 except Exception as e:
-                    logger.error(f"DeepSeek API error: {str(e)}")
+                    logger.error(f"DeepSeek API error: {e}")
                     raise
             else:
                 raise
