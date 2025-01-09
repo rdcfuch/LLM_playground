@@ -5,7 +5,6 @@ import logging
 import datetime
 from dotenv import load_dotenv
 import httpx
-from openai import OpenAI
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -17,22 +16,19 @@ class RAGManager:
         self.collection_name = collection_name
         self.files = {}  # Store file metadata: {file_id: {name, size, chunks}}
         
-        # Initialize OpenAI client
-        self.openai_client = OpenAI()
-        
-        # Initialize DeepSeek client for backup
+        # Initialize DeepSeek client
         deepseek_api_key = os.getenv("DeepSeek_API_KEY")
         deepseek_base_url = os.getenv("DeepSeek_BASE_URL")
         
-        if deepseek_api_key and deepseek_base_url:
-            self.deepseek_client = httpx.Client(
-                base_url=deepseek_base_url,
-                headers={"Authorization": f"Bearer {deepseek_api_key}"},
-                timeout=30.0
-            )
-        else:
-            self.deepseek_client = None
+        if not deepseek_api_key or not deepseek_base_url:
+            raise ValueError("DeepSeek API key and base URL are required")
             
+        self.deepseek_client = httpx.Client(
+            base_url=deepseek_base_url,
+            headers={"Authorization": f"Bearer {deepseek_api_key}"},
+            timeout=30.0
+        )
+        
     def add_knowledge(self, texts: List[str], metadata: Optional[List[Dict]] = None) -> str:
         """Add new knowledge to the vector store and return the file ID."""
         import uuid
@@ -83,10 +79,7 @@ class RAGManager:
         return context
         
     def generate_response(self, query: str, k: int = 8) -> str:
-        """Generate a response using OpenAI or DeepSeek."""
-        if not self.has_knowledge():
-            raise ValueError("Cannot enable knowledge base: No files available. Please upload files first.")
-            
+        """Generate a response using DeepSeek."""
         try:
             # Get relevant documents
             results = self.query_knowledge(query, k)
@@ -103,47 +96,26 @@ Here is the relevant information:
 """ + context
 
             try:
-                # Try OpenAI first
-                logger.info("Attempting to generate response with OpenAI")
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": query}
-                    ],
-                    temperature=0.7,
-                    max_tokens=500
+                logger.info("Generating response with DeepSeek")
+                response = self.deepseek_client.post(
+                    "/v1/chat/completions",
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": query}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 500
+                    }
                 )
-                return response.choices[0].message.content
-                
-            except Exception as openai_error:
-                logger.error(f"OpenAI error: {openai_error}")
-                
-                # Fallback to DeepSeek if available
-                if self.deepseek_client:
-                    try:
-                        logger.info("Falling back to DeepSeek")
-                        response = self.deepseek_client.post(
-                            "/v1/chat/completions",
-                            json={
-                                "model": "deepseek-chat",
-                                "messages": [
-                                    {"role": "system", "content": system_prompt},
-                                    {"role": "user", "content": query}
-                                ],
-                                "temperature": 0.7,
-                                "max_tokens": 500
-                            }
-                        )
-                        response.raise_for_status()
-                        return response.json()["choices"][0]["message"]["content"]
-                        
-                    except Exception as deepseek_error:
-                        logger.error(f"DeepSeek error: {deepseek_error}")
-                        raise Exception("Both OpenAI and DeepSeek failed to generate a response")
-                else:
-                    raise openai_error
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"]
                     
+            except Exception as e:
+                logger.error(f"DeepSeek error: {e}")
+                raise Exception("Failed to generate a response")
+                
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             raise
