@@ -32,10 +32,10 @@ class VectorStore:
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=300,
-            chunk_overlap=100,
+            chunk_size=1000,  # Increased for more context
+            chunk_overlap=200,  # Increased overlap for better context preservation
             length_function=len,
-            is_separator_regex=False,
+            separators=["\n\n", "\n", "。", ".", "!", "?", ";", ",", " "]  # Added more separators
         )
 
         # Initialize embedding model
@@ -240,43 +240,93 @@ class VectorStore:
             
     def search(self, query: str, k: int = 5) -> List[Dict]:
         """Search for similar documents."""
-        # Ensure collection exists
-        if not self.client.describe_collection(self.collection_name):
-            raise ValueError("Collection does not exist")
-            
         try:
+            # Ensure collection exists and is loaded
+            if not self.client.describe_collection(self.collection_name):
+                raise ValueError("Collection does not exist")
+                
+            # Load collection if not already loaded
+            try:
+                self.client.load_collection(self.collection_name)
+                logger.info("Collection loaded successfully")
+            except Exception as e:
+                logger.error(f"Error loading collection: {e}")
+                raise
+                
             # Get query embedding
-            query_embedding = self.embedding_model.encode_queries([query])[0]
+            try:
+                query_embedding = self.embedding_model.encode_queries([query])[0].tolist()
+                logger.info("Generated query embedding successfully")
+            except Exception as e:
+                logger.error(f"Error generating query embedding: {e}")
+                raise
             
-            # Search in Milvus
+            # Search in Milvus with improved parameters
+            logger.info("Searching in Milvus")
+            search_params = {
+                "metric_type": "IP",
+                "params": {
+                    "nprobe": 16,  # Increased for better recall
+                    "ef": 64       # Search scope
+                }
+            }
+            
+            # Search with more results initially
             results = self.client.search(
                 collection_name=self.collection_name,
                 data=[query_embedding],
-                field_name="vector",
-                index_name="vector_index",
-                limit=k,
-                param={
-                    "metric_type": "IP",
-                    "params": {"nprobe": 10}
-                },
-                output_fields=["text", "source", "type", "file_id"]  # Include metadata fields
+                output_fields=["text", "source", "type", "file_id"],
+                search_params=search_params,
+                limit=k * 2  # Get more results initially for better filtering
             )
             
-            # Format results
+            if not results:
+                logger.warning("No results found for query")
+                return []
+                
+            # Format results with improved filtering
             formatted_results = []
+            seen_texts = set()  # To avoid near-duplicate chunks
+            
             for hits in results:
                 for hit in hits:
+                    # Extract entity data
+                    entity = hit.get('entity', {})
+                    if not entity or not all(field in entity for field in ["text", "source", "type", "file_id"]):
+                        logger.warning(f"Skipping hit due to missing fields: {hit}")
+                        continue
+                    
+                    # Skip if too similar to already included texts
+                    text = entity["text"].strip()
+                    if text in seen_texts:
+                        continue
+                        
+                    # Skip if score is too low
+                    score = float(hit["distance"])
+                    if score < 0.5:  # Adjust threshold as needed
+                        logger.debug(f"Skipping result with low score: {score}")
+                        continue
+                        
                     result = {
-                        'text': hit.entity.get('text', ''),
-                        'score': hit.score,
+                        'text': text,
+                        'score': score,
                         'metadata': {
-                            'source': hit.entity.get('source'),
-                            'type': hit.entity.get('type'),
-                            'file_id': hit.entity.get('file_id')
+                            'source': entity["source"],
+                            'type': entity["type"],
+                            'file_id': entity["file_id"]
                         }
                     }
                     formatted_results.append(result)
+                    seen_texts.add(text)
                     
+                    # Stop if we have enough good results
+                    if len(formatted_results) >= k:
+                        break
+                        
+                if len(formatted_results) >= k:
+                    break
+            
+            logger.info(f"Found {len(formatted_results)} relevant documents")
             return formatted_results
             
         except Exception as e:

@@ -56,7 +56,7 @@ class RAGManager:
         """Check if there is any knowledge in the vector store."""
         return self.vector_store.has_documents()
         
-    def query_knowledge(self, query: str, k: int = 5) -> List[Dict]:
+    def query_knowledge(self, query: str, k: int = 8) -> List[Dict]:
         """Query the knowledge base."""
         if not self.has_knowledge():
             raise ValueError("Knowledge base is empty. Please add documents first.")
@@ -65,59 +65,89 @@ class RAGManager:
         
     def _format_context(self, results: List[Dict]) -> str:
         """Format search results for adding to prompt context."""
-        context = "Here is the relevant information from the knowledge base:\n\n"
-        for i, result in enumerate(results, 1):
-            context += f"{i}. {result['text']}\n"
+        context = "Here are the relevant passages from the knowledge base:\n\n"
+        
+        # Sort results by score in descending order
+        sorted_results = sorted(results, key=lambda x: x['score'], reverse=True)
+        
+        for i, result in enumerate(sorted_results, 1):
+            # Add score and source information as a header
+            context += f"[Passage {i} (Relevance: {result['score']:.2f})"
             if result['metadata'].get('source'):
-                context += f"   Source: {result['metadata']['source']}\n"
-            context += "\n"
+                context += f", Source: {result['metadata']['source']}"
+            context += "]\n"
+            
+            # Add the text content
+            context += f"{result['text'].strip()}\n\n"
+            
         return context
         
-    def generate_response(self, query: str, k: int = 5) -> str:
+    def generate_response(self, query: str, k: int = 8) -> str:
         """Generate a response using OpenAI or DeepSeek."""
         if not self.has_knowledge():
             raise ValueError("Cannot enable knowledge base: No files available. Please upload files first.")
             
-        results = self.query_knowledge(query, k)
-        context = self._format_context(results)
-        
-        system_prompt = """You are a helpful AI assistant. Answer questions based ONLY on the provided knowledge. 
+        try:
+            # Get relevant documents
+            results = self.query_knowledge(query, k)
+            if not results:
+                return "I don't have any relevant information to answer that question."
+                
+            context = self._format_context(results)
+            
+            system_prompt = """You are a helpful AI assistant. Answer questions based ONLY on the provided knowledge. 
 If you cannot find the answer in the provided information, say "I don't have enough information to answer that question."
 DO NOT make up or infer information that is not explicitly stated in the context.
 
 Here is the relevant information:
 """ + context
 
-        try:
-            # Try OpenAI first
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ]
-            )
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            logger.error(f"Error with OpenAI: {str(e)}")
-            if self.deepseek_client:
-                try:
-                    response = self.deepseek_client.post("/v1/chat/completions", json={
-                        "model": "deepseek-chat",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": query}
-                        ]
-                    })
-                    response.raise_for_status()
-                    return response.json()['choices'][0]['message']['content']
-                except Exception as e:
-                    logger.error(f"Error with DeepSeek: {str(e)}")
-                    raise
-            else:
-                raise
+            try:
+                # Try OpenAI first
+                logger.info("Attempting to generate response with OpenAI")
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": query}
+                    ],
+                    temperature=0.7,
+                    max_tokens=500
+                )
+                return response.choices[0].message.content
                 
+            except Exception as openai_error:
+                logger.error(f"OpenAI error: {openai_error}")
+                
+                # Fallback to DeepSeek if available
+                if self.deepseek_client:
+                    try:
+                        logger.info("Falling back to DeepSeek")
+                        response = self.deepseek_client.post(
+                            "/v1/chat/completions",
+                            json={
+                                "model": "deepseek-chat",
+                                "messages": [
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": query}
+                                ],
+                                "temperature": 0.7,
+                                "max_tokens": 500
+                            }
+                        )
+                        response.raise_for_status()
+                        return response.json()["choices"][0]["message"]["content"]
+                        
+                    except Exception as deepseek_error:
+                        logger.error(f"DeepSeek error: {deepseek_error}")
+                        raise Exception("Both OpenAI and DeepSeek failed to generate a response")
+                else:
+                    raise openai_error
+                    
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            raise
+            
     def delete_file(self, file_id: str) -> bool:
         """Delete a file and its associated documents from the knowledge base."""
         try:
