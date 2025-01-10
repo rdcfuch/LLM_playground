@@ -377,9 +377,20 @@ class ChatApp {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
-        // Add message text
+        // Add message text with markdown rendering
         const textDiv = document.createElement('div');
-        textDiv.textContent = message;
+        if (role === 'assistant') {
+            // Clean and render markdown for assistant messages
+            const cleanedMessage = this.cleanMarkdown(message);
+            textDiv.innerHTML = marked.parse(cleanedMessage, {
+                breaks: true,
+                gfm: true,
+                sanitize: false
+            });
+        } else {
+            // For user and system messages, just use plain text
+            textDiv.textContent = message;
+        }
         contentDiv.appendChild(textDiv);
         
         // If there are sources, add them inside content div
@@ -402,37 +413,37 @@ class ChatApp {
         messageDiv.appendChild(contentDiv);
         this.chatMessages.appendChild(messageDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+
+        // Apply syntax highlighting to code blocks
+        if (role === 'assistant') {
+            messageDiv.querySelectorAll('pre code').forEach((block) => {
+                Prism.highlightElement(block);
+            });
+        }
     }
 
     cleanMarkdown(text) {
-        // Fix spacing issues in markdown
         return text
-            // Remove space between parenthesis and bold/italic markers
-            .replace(/\) \*\*/g, ')**')
-            .replace(/\) \*/g, ')*')
-            // Remove space between bold/italic markers and parenthesis
-            .replace(/\*\* \(/g, '**(')
-            .replace(/\* \(/g, '*(')
-            // Fix other common spacing issues
-            .replace(/\*\* /g, '**')
-            .replace(/ \*\*/g, '**')
-            .replace(/\* /g, '*')
-            .replace(/ \*/g, '*');
-    }
-
-    formatCodeBlocks(content) {
-        const parts = content.split('```');
-        let formatted = '';
-        parts.forEach((part, index) => {
-            if (index % 2 === 0) {
-                // Regular text
-                formatted += part;
-            } else {
-                // Code block
-                formatted += `<pre><code>${part}</code></pre>`;
-            }
-        });
-        return formatted;
+            // Remove extra spaces around markdown syntax
+            .replace(/\s*([*_~`])\s*/g, '$1')
+            // Fix list formatting
+            .replace(/^\s*[-*+]\s+/gm, '- ')
+            .replace(/^\s*(\d+\.)\s+/gm, '$1 ')
+            // Fix heading formatting
+            .replace(/^\s*(#{1,6})\s+/gm, '$1 ')
+            // Fix blockquote formatting
+            .replace(/^\s*>\s+/gm, '> ')
+            // Fix code block formatting
+            .replace(/```(\w*)\s+/g, '```$1\n')
+            .replace(/\s+```/g, '\n```')
+            // Fix inline code formatting
+            .replace(/`\s+/g, '`')
+            .replace(/\s+`/g, '`')
+            // Fix link and image formatting
+            .replace(/\[\s+/g, '[')
+            .replace(/\s+\]/g, ']')
+            .replace(/\(\s+/g, '(')
+            .replace(/\s+\)/g, ')');
     }
 }
 

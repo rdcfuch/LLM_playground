@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
 
-#sournce article: https://medium.com/the-ai-forum/build-a-reliable-rag-agent-using-langgraph-2694d55995cd 
+#Sournce article: https://medium.com/the-ai-forum/build-a-reliable-rag-agent-using-langgraph-2694d55995cd 
 
 # Load environment variables
 load_dotenv()

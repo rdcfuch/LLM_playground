@@ -199,7 +199,7 @@ body {
     border-radius: 18px;
     position: relative;
     word-wrap: break-word;
-    max-width: 100%;
+    line-height: 1.5;
 }
 
 .user-message .message-content {
@@ -386,6 +386,100 @@ body {
 
 .message.user .message-content {
     color: var(--text-color);
+}
+
+/* Markdown Styles */
+.assistant-message .message-content {
+    background-color: var(--bg-primary);
+}
+
+.assistant-message .message-content h1,
+.assistant-message .message-content h2,
+.assistant-message .message-content h3,
+.assistant-message .message-content h4,
+.assistant-message .message-content h5,
+.assistant-message .message-content h6 {
+    margin: 1em 0 0.5em;
+    line-height: 1.3;
+}
+
+.assistant-message .message-content p {
+    margin: 0.5em 0;
+}
+
+.assistant-message .message-content ul,
+.assistant-message .message-content ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+}
+
+.assistant-message .message-content li {
+    margin: 0.25em 0;
+}
+
+.assistant-message .message-content pre {
+    margin: 0.5em 0;
+    padding: 1em;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.assistant-message .message-content code {
+    padding: 0.2em 0.4em;
+    background-color: #f6f8fa;
+    border-radius: 3px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.9em;
+}
+
+.assistant-message .message-content pre code {
+    padding: 0;
+    background-color: transparent;
+}
+
+.assistant-message .message-content blockquote {
+    margin: 0.5em 0;
+    padding: 0.5em 1em;
+    border-left: 4px solid #dfe2e5;
+    color: #6a737d;
+}
+
+.assistant-message .message-content a {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+.assistant-message .message-content a:hover {
+    text-decoration: underline;
+}
+
+.assistant-message .message-content table {
+    margin: 0.5em 0;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.assistant-message .message-content th,
+.assistant-message .message-content td {
+    padding: 6px 13px;
+    border: 1px solid #dfe2e5;
+}
+
+.assistant-message .message-content th {
+    background-color: #f6f8fa;
+    font-weight: 600;
+}
+
+.assistant-message .message-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.assistant-message .message-content hr {
+    margin: 1em 0;
+    border: none;
+    border-top: 1px solid #dfe2e5;
 }
 
 /* Thinking Animation */
