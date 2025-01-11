@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Web Translation Assistant",
+  "version": "1.0",
+  "description": "Adds Chinese translations under webpage chapters",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.deepseek.com/*"
+  ],
+  "web_accessible_resources": [{
+    "resources": ["images/*"],
+    "matches": ["<all_urls>"]
+  }],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "css": ["styles.css"]
+  }]
+}
