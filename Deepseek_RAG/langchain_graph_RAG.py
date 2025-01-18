@@ -5,6 +5,8 @@ from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
+from PIL import Image
+
 
 #Sournce article: https://medium.com/the-ai-forum/build-a-reliable-rag-agent-using-langgraph-2694d55995cd 
 
@@ -80,7 +82,7 @@ question_router = prompt | llm | JsonOutputParser()
 # Implement the Generate Chain
 prompt = PromptTemplate(
     template="""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You are an assistant for question-answering tasks. 
-    Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
+    Use the following pieces of retrieved context to answer the question. you will think the question step by step and determine how to answer it. If you don't know the answer, just say that you don't know. 
     Use three sentences maximum and keep the answer concise <|eot_id|><|start_header_id|>user<|end_header_id|>
     Question: {question} 
     Context: {context} 
@@ -186,7 +188,7 @@ class GraphState(TypedDict):
 from langchain.schema import Document
 def retrieve(state):
     """
-    Retrieve documents from vectorstore
+    break down the question into easy points, and retrieve documents from vectorstore
 
     Args:
         state (dict): The current graph state
@@ -307,7 +309,7 @@ def route_question(state):
     
 def decide_to_generate(state):
     """
-    Determines whether to generate an answer, or add web search
+    Determines whether the current knowldege is sufficient to generate an answer, if not, let's do the web search to get the related answers.
 
     Args:
         state (dict): The current graph state
@@ -443,6 +445,20 @@ def create_workflow(enable_web_search: bool = True) -> StateGraph:
 # Create and compile the workflow
 workflow = create_workflow(enable_web_search=False)
 app = workflow.compile()
+
+# draw the diagram
+print("draw the diagram")
+# app.get_graph().draw_png(output_file_path="graph.png")
+# image=Image.open("graph.png")
+# image.show()
+
+from IPython.display import Image, display
+
+try:
+    display(Image(app.get_graph(xray=True).draw_png(output_file_path="./graph.png")))
+except Exception as e:
+    print("ERROR: ",e)
+
 
 while True:
     question = input("请输入问题：")
