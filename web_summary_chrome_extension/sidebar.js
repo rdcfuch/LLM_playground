@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
     const lengthSelect = document.getElementById('length');
+    const languageSelect = document.getElementById('language');
     const summaryElement = document.getElementById('summary');
     const loadingElement = document.getElementById('loading');
     const questionsSection = document.getElementById('questions-section');
@@ -12,13 +13,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const suggestedQuestionsContainer = document.querySelector('.suggested-questions');
 
     // Check if there's a pending summarization request
-    const result = await chrome.storage.local.get(['pendingSummarizeTabId']);
+    const result = await chrome.storage.local.get(['pendingSummarizeTabId', 'summaryLanguage']);
     if (result.pendingSummarizeTabId) {
         // Clear the pending flag
         chrome.storage.local.remove('pendingSummarizeTabId');
         // Start summarizing immediately
         summarizeCurrentPage();
     }
+
+    // Set default language to English if not already set
+    if (!result.summaryLanguage) {
+        chrome.storage.local.set({ summaryLanguage: 'english' });
+    }
+    languageSelect.value = result.summaryLanguage || 'english';
 
     // Always set to short and clear any existing preference
     lengthSelect.value = 'short';
@@ -28,6 +35,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     lengthSelect.addEventListener('change', () => {
         chrome.storage.local.set({
             summaryLength: lengthSelect.value
+        });
+    });
+
+    languageSelect.addEventListener('change', () => {
+        chrome.storage.local.set({
+            summaryLanguage: languageSelect.value
         });
     });
 
@@ -114,29 +127,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
-            const result = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: getPageContent
-            });
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
 
-            const pageContent = result[0].result;
-            const summary = await generateSummary(pageContent, lengthSelect.value, API_KEY);
-            
-            summaryElement.innerHTML = summary;
-            summaryElement.classList.remove('hidden');
-            questionsSection.classList.remove('hidden');
-            
-            // Generate and display suggested questions
-            const questions = await generateSuggestedQuestions(summary);
-            displaySuggestedQuestions(questions);
-            
-            // Store the summary for follow-up questions
-            chrome.storage.local.set({
-                currentSummary: summary
-            });
+            // Check if we have permission to access the tab
+            try {
+                const result = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    function: getPageContent
+                });
+
+                if (!result || !result[0] || !result[0].result) {
+                    throw new Error('Could not extract content from the page');
+                }
+
+                const pageContent = result[0].result;
+                if (!pageContent.trim()) {
+                    throw new Error('No readable content found on the page');
+                }
+
+                const summary = await generateSummary(pageContent, lengthSelect.value, API_KEY);
+                summaryElement.innerHTML = summary;
+                summaryElement.classList.remove('hidden');
+                questionsSection.classList.remove('hidden');
+                
+                // Generate and display suggested questions
+                const questions = await generateSuggestedQuestions(summary);
+                displaySuggestedQuestions(questions);
+                
+                // Store the summary for follow-up questions
+                chrome.storage.local.set({
+                    currentSummary: summary
+                });
+            } catch (error) {
+                if (error.message.includes('Cannot access contents of')) {
+                    throw new Error('Cannot access this page. The extension needs permission to read the page content.');
+                } else {
+                    throw error;
+                }
+            }
         } catch (error) {
-            summaryElement.textContent = 'Error generating summary: ' + error.message;
+            summaryElement.textContent = 'Error: ' + error.message;
             summaryElement.classList.remove('hidden');
         } finally {
             loadingElement.classList.add('hidden');
@@ -163,8 +195,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Function to get page content
-function getPageContent() {
-    // Get the article content if available
+async function getPageContent() {
+    // Get article content if available
     const article = document.querySelector('article');
     if (article) {
         return article.innerText;
@@ -176,20 +208,42 @@ function getPageContent() {
         return main.innerText;
     }
 
-    // Otherwise, get all paragraph text
-    const paragraphs = Array.from(document.getElementsByTagName('p'));
-    return paragraphs.map(p => p.innerText).join('\n\n');
+    // If no specific content container is found, get all visible text
+    const body = document.body;
+    const walker = document.createTreeWalker(
+        body,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: function(node) {
+                const style = window.getComputedStyle(node.parentElement);
+                return (style.display !== 'none' && style.visibility !== 'hidden')
+                    ? NodeFilter.FILTER_ACCEPT
+                    : NodeFilter.FILTER_REJECT;
+            }
+        }
+    );
+
+    let content = '';
+    let node;
+    while (node = walker.nextNode()) {
+        content += node.textContent.trim() + '\n';
+    }
+    
+    return content.trim();
 }
 
 // Function to generate summary using Kimi API
 async function generateSummary(content, length, apiKey) {
+    const language = await chrome.storage.local.get(['summaryLanguage']).then(result => result.summaryLanguage || 'english');
+    const languagePrompt = language === 'chinese' ? 'Please summarize in Chinese (简体中文).' : 'Please summarize in English.';
+    
     const lengthPrompts = {
         short: "Provide a very concise summary in 2-3 sentences.",
         medium: "Provide a balanced summary in about 5-6 sentences.",
         long: "Provide a detailed summary in about 8-10 sentences."
     };
 
-    const prompt = `Please summarize the following text in Chinese with length of ${lengthPrompts[length]} Format the response in HTML with appropriate headings and bullet points for key information:\n\n${content}`;
+    const prompt = `${languagePrompt} Please provide a ${length} summary of the following webpage content:\n\n${content}`;
 
     const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
         method: 'POST',
