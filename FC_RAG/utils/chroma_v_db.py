@@ -4,7 +4,7 @@ import os
 import uuid
 from dotenv import load_dotenv
 import pdfplumber
-import openai
+from openai import OpenAI
 import chromadb
 from chromadb.config import Settings
 from pytesseract import image_to_string
@@ -17,20 +17,31 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Configuration
-EMBEDDING_MODEL = "text-embedding-ada-002"  # Adjust model version if necessary
-CHUNK_SIZE = 200  # Adjust chunk size for splitting text
-VECTOR_DB_DIR = "vector_db"  # Directory for Chroma DB
+EMBEDDING_MODEL = "text-embedding-ada-002"
+CHUNK_SIZE = 200
+
+# Get absolute path for vector database
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+VECTOR_DB_DIR = os.path.join(PROJECT_DIR, "FC_RAG", "vector_db")
+
+# Create vector database directory if it doesn't exist
+os.makedirs(VECTOR_DB_DIR, exist_ok=True)
+print(f"Vector database directory: {VECTOR_DB_DIR}")
 
 # Initialize OpenAI client
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Initialize vector database
-chroma_client = chromadb.Client(
-    Settings(
-        persist_directory=VECTOR_DB_DIR  # Directory for Chroma DB persistence
-    )
+# Initialize vector database with persistence
+chroma_client = chromadb.PersistentClient(
+    path=VECTOR_DB_DIR
 )
-collection = chroma_client.get_or_create_collection(name="pdf_embeddings")
+
+# Get or create collection
+collection = chroma_client.get_or_create_collection(
+    name="file_embeddings_v2",
+    metadata={"hnsw:space": "cosine"}  # Use cosine similarity
+)
 
 
 # Extract text from PDF
@@ -60,6 +71,23 @@ def extract_text_via_ocr(pdf_path):
     return text
 
 
+# Extract text from file
+def extract_text_from_file(file_path):
+    """Extract text from PDF or text file"""
+    if file_path.lower().endswith('.pdf'):
+        return extract_text_from_pdf(file_path)
+    elif file_path.lower().endswith('.txt'):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"Error reading text file: {e}")
+            return ""
+    else:
+        print(f"Unsupported file type: {file_path}")
+        return ""
+
+
 # Split text into chunks
 def split_text(text, chunk_size=CHUNK_SIZE):
     chunks = []
@@ -69,10 +97,10 @@ def split_text(text, chunk_size=CHUNK_SIZE):
     return chunks
 
 
-# Generate a unique hash for the PDF content
-def compute_pdf_hash(pdf_path):
+# Generate a unique hash for the file content
+def compute_file_hash(file_path):
     hash_md5 = hashlib.md5()
-    with open(pdf_path, "rb") as f:
+    with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
@@ -83,85 +111,167 @@ def generate_embeddings(text_chunks):
     embeddings = []
     try:
         for chunk in text_chunks:
-            response = openai.Embedding.create(
+            response = client.embeddings.create(
                 input=chunk,
                 model=EMBEDDING_MODEL,
             )
-            embeddings.append(response['data'][0]['embedding'])
+            embeddings.append(response.data[0].embedding)
     except Exception as e:
         print(f"Error generating embeddings: {e}")
     return embeddings
 
 
 # Store embeddings in the vector database
-def store_embeddings_in_db(pdf_name, text_chunks, embeddings, pdf_hash):
-    # Check if the PDF hash already exists in metadata
+def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash):
+    """Store embeddings in the vector database"""
+    print(f"\nDebug - Storing embeddings:")
+    print(f"File name: {file_name}")
+    print(f"Number of chunks: {len(text_chunks)}")
+    print(f"Number of embeddings: {len(embeddings)}")
+    print(f"File hash: {file_hash}")
+    
+    # Check if the file hash already exists in metadata
     existing_ids = [
         metadata["chunk_id"]
         for metadata in collection.get()["metadatas"]
-        if metadata.get("pdf_hash") == pdf_hash
+        if metadata.get("file_hash") == file_hash
     ]
     if existing_ids:
-        print(f"Embeddings for {pdf_name} already exist in the database.")
+        print(f"Embeddings for {file_name} already exist in the database.")
         return
 
     ids = [str(uuid.uuid4()) for _ in range(len(text_chunks))]
-    metadatas = [{"pdf_name": pdf_name, "chunk_id": i, "pdf_hash": pdf_hash} for i in range(len(text_chunks))]
+    metadatas = [{"file_name": file_name, "chunk_id": i, "file_hash": file_hash} for i in range(len(text_chunks))]
+    
+    print(f"\nDebug - Adding to collection:")
+    print(f"Collection name: {collection.name}")
+    print(f"Number of IDs: {len(ids)}")
+    print(f"Sample text chunk: {text_chunks[0][:100]}...")
+    
     collection.add(
         ids=ids,
         embeddings=embeddings,
         metadatas=metadatas,
         documents=text_chunks,
     )
-    print(f"Embeddings for {pdf_name} stored successfully!")
+    print(f"Embeddings for {file_name} stored successfully!")
 
 
 # Query the vector database
-def query_vector_db(query_text, top_k=5):
+def query_vector_db(query_text=None, ctx=None):
+    """
+    Query the vector database for relevant documents
+    Args:
+        query_text: Text to search for
+        ctx: RunContext object from pydantic_ai
+    Returns:
+        str: JSON string with search results
+    """
     try:
-        query_embedding_response = openai.Embedding.create(
+        # Extract query from context if available
+        if isinstance(query_text, dict) and 'query' in query_text:
+            query_text = query_text['query']
+        elif isinstance(query_text, str):
+            query_text = query_text
+        else:
+            query_text = "termite inspection report"
+            
+        print(f"\nDebug - Query text: {query_text}")
+            
+        if not query_text:
+            return json.dumps({"results": [], "query": ""})
+            
+        # Get embedding for the query
+        query_response = client.embeddings.create(
             input=query_text,
             model=EMBEDDING_MODEL,
         )
-        query_embedding = query_embedding_response['data'][0]['embedding']
+        query_embedding = query_response.data[0].embedding
+        print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
+        
+        # Get collection info
+        collection_items = collection.get()
+        print(f"\nDebug - Collection info:")
+        print(f"Number of items: {len(collection_items.get('ids', []))}")
+        print(f"Available metadata: {collection_items.get('metadatas', [])}")
+        
+        # Query the collection
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k,
+            n_results=5,
+            include=["documents", "metadatas", "distances"]
         )
-        return results
+        
+        print(f"\nDebug - Raw query results:")
+        print(json.dumps(results, indent=2))
+        
+        # Format results as simple types for JSON serialization
+        formatted_results = {
+            "documents": list(map(str, results["documents"][0])) if results["documents"] else [],
+            "metadata": [dict(m) for m in results["metadatas"][0]] if results["metadatas"] else [],
+            "distances": [float(d) for d in results["distances"][0]] if results["distances"] else []
+        }
+        
+        # Return JSON string
+        return json.dumps({
+            "results": formatted_results,
+            "query": query_text
+        })
+        
     except Exception as e:
         print(f"Error querying vector database: {e}")
-        return []
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return json.dumps({"results": {"documents": [], "metadata": [], "distances": []}, "query": str(query_text)})
 
-
-# Main function to process PDF and store embeddings
-def process_pdf(pdf_path):
-    pdf_name = os.path.basename(pdf_path)
-    pdf_hash = compute_pdf_hash(pdf_path)
-    print(f"Processing: {pdf_name} (Hash: {pdf_hash})")
-
-    # Extract text
-    text = extract_text_from_pdf(pdf_path)
-    if not text:
-        text = extract_text_via_ocr(pdf_path)
-
-    if not text:
-        print(f"Failed to extract text from {pdf_name}")
-        return
-
-    # Preprocess text and generate embeddings
-    text_chunks = split_text(text)
-    embeddings = generate_embeddings(text_chunks)
-
-    # Store in vector database
-    store_embeddings_in_db(pdf_name, text_chunks, embeddings, pdf_hash)
+# Main function to process files and store embeddings
+def process_file(file_path):
+    """Process a file and store its embeddings in the vector database"""
+    try:
+        print(f"\nDebug - Processing file: {file_path}")
+        
+        # Extract text from the file
+        text = extract_text_from_file(file_path)
+        print(f"Extracted text length: {len(text)}")
+        if not text:
+            print(f"No text could be extracted from {file_path}")
+            return False
+            
+        # Generate a unique hash for the file content
+        file_hash = compute_file_hash(file_path)
+        print(f"Generated file hash: {file_hash}")
+        
+        # Split text into chunks
+        text_chunks = split_text(text)
+        print(f"Generated {len(text_chunks)} text chunks")
+        if not text_chunks:
+            print(f"No text chunks generated from {file_path}")
+            return False
+            
+        # Generate embeddings
+        embeddings = generate_embeddings(text_chunks)
+        print(f"Generated {len(embeddings)} embeddings")
+        if not embeddings:
+            print(f"Failed to generate embeddings for {file_path}")
+            return False
+            
+        # Store in vector database
+        store_embeddings_in_db(os.path.basename(file_path), text_chunks, embeddings, file_hash)
+        print(f"Successfully processed {file_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error processing file {file_path}: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return False
 
 
 # Example usage
 if __name__ == "__main__":
-    pdf_files = ["example.pdf"]  # Replace with paths to your PDF files
-    for pdf_file in pdf_files:
-        process_pdf(pdf_file)
+    file_paths = ["example.pdf", "example.txt"]  # Replace with paths to your files
+    for file_path in file_paths:
+        process_file(file_path)
 
     # Query example
     query_result = query_vector_db("Is there any termite?")
