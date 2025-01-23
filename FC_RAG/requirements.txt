@@ -1,0 +1,8 @@
+# requirements.txt
+python-dotenv
+pdfplumber
+openai
+chromadb
+pytesseract
+Pillow
+PyPDF2
