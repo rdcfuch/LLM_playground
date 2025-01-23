@@ -11,6 +11,7 @@ from pytesseract import image_to_string
 from PIL import Image
 import PyPDF2
 from io import BytesIO
+from typing import List
 
 # Load environment variables from .env file
 load_dotenv()
@@ -266,6 +267,59 @@ def process_file(file_path):
         print(f"Full traceback: {traceback.format_exc()}")
         return False
 
+
+def remove_file_from_db(file_name: str) -> bool:
+    """
+    Remove a file and its embeddings from the vector database
+    Args:
+        file_name: Name of the file to remove (e.g., 'example.pdf')
+    Returns:
+        bool: True if file was found and removed, False otherwise
+    """
+    try:
+        # Get all items in collection
+        collection_items = collection.get()
+        
+        # Find all IDs associated with this file
+        file_ids = []
+        for i, metadata in enumerate(collection_items.get("metadatas", [])):
+            if metadata.get("file_name") == file_name:
+                file_ids.append(collection_items["ids"][i])
+                
+        if not file_ids:
+            print(f"No embeddings found for file: {file_name}")
+            return False
+            
+        # Delete the embeddings
+        collection.delete(ids=file_ids)
+        print(f"Successfully removed {len(file_ids)} embeddings for file: {file_name}")
+        return True
+        
+    except Exception as e:
+        print(f"Error removing file from database: {e}")
+        return False
+
+def list_files_in_db() -> List[str]:
+    """
+    List all unique files stored in the vector database
+    Returns:
+        List[str]: List of unique file names
+    """
+    try:
+        # Get all items in collection
+        collection_items = collection.get()
+        
+        # Get unique file names
+        files = set()
+        for metadata in collection_items.get("metadatas", []):
+            if metadata.get("file_name"):
+                files.add(metadata["file_name"])
+                
+        return sorted(list(files))
+        
+    except Exception as e:
+        print(f"Error listing files in database: {e}")
+        return []
 
 # Example usage
 if __name__ == "__main__":
