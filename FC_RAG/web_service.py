@@ -1,21 +1,22 @@
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 import os
-from utils.chroma_v_db import validate_file, process_file, list_files_in_db, ChromaVectorStore, remove_file_from_db
+import json
+from utils.chroma_v_db import validate_file, process_file, list_files_in_db, ChromaVectorStore, remove_file_from_db, query_vector_db
+from pydantic_tool_rag_chroma import handle_questions
 
 app = FastAPI(title="Knowledge Base Manager")
+
+# Initialize vector store at module level
+vector_store = ChromaVectorStore()
 
 # Create static directory if it doesn't exist
 os.makedirs("static", exist_ok=True)
 
 # Mount static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Initialize vector store
-vector_store = ChromaVectorStore()
 
 # Enable CORS
 app.add_middleware(
@@ -297,6 +298,33 @@ async def delete_file(filename: str):
     except Exception as e:
         print(f"Error deleting file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
+
+@app.post("/query")
+async def query_endpoint(request: Request):
+    try:
+        data = await request.json()
+        query_text = data.get("query", "")
+        context = data.get("context", "")  # Optional context
+        
+        if not query_text:
+            raise HTTPException(status_code=400, detail="Query text is required")
+            
+        # Use handle_questions for better responses
+        response = await handle_questions(query_text, context)
+        print("=== got response: =======")
+        print(response)
+        
+        # If there was an error, return it with a 500 status code
+        if "error" in response:
+            raise HTTPException(status_code=500, detail=response["error"])
+            
+        return response
+        
+    except Exception as e:
+        print(f"Error processing query: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

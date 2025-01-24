@@ -1,17 +1,17 @@
 from typing import Dict, List, Optional
-import nest_asyncio
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, Tool
 from pydantic_ai.models.openai import OpenAIModel
 import os
 import json
+import asyncio
 from utils.chroma_v_db import (
     query_vector_db as chroma_query_db, 
     process_file, 
     remove_file_from_db, 
     list_files_in_db, 
     get_db_contents,
-    collection,
+    ChromaVectorStore,
     client as openai_client,
     EMBEDDING_MODEL,
     display_results,
@@ -21,7 +21,6 @@ from utils.chroma_v_db import (
 
 # Set environment variable to ignore Logfire warnings
 os.environ["LOGFIRE_IGNORE_NO_CONFIG"] = "1"
-nest_asyncio.apply()
 
 # Model configuration
 DeepSeek_MODEL = "deepseek-chat"
@@ -91,7 +90,7 @@ agent = Agent(
 )
 
 @agent.tool()
-def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dict:
+async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dict:
     """Query the vector database with the given text query"""
     try:
         print(f"\nDebug - Query text: {query_text}")
@@ -106,6 +105,8 @@ def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dic
         
         # Get collection info
         print("\nDebug - Collection info:")
+        vector_store = ChromaVectorStore()
+        collection = vector_store.get_collection()
         print(f"Number of items: {collection.count()}")
         print(f"Available metadata: {[m for m in collection.get()['metadatas']]}")
         
@@ -134,78 +135,56 @@ def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dic
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
-def analyze_with_reflection(query_text: str, context: str = ""):
+async def analyze_with_reflection(query_text: str, context: str = ""):
     """Analyze documents with self-reflection capabilities"""
     
     # Run analysis with reflection
     query = QueryInput(query=query_text, context=context)
-    response = agent.run_sync(
-        user_prompt=f"Analyze the following query with self-reflection: {query_text}",
-        deps=query
-    )
+    try:
+        response = await agent.run(
+            user_prompt=f"Analyze the following query with self-reflection: {query_text}",
+            deps=query
+        )
+        return response.data
+    except Exception as e:
+        print(f"Error in analyze_with_reflection: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise
 
-    # Print results with reflection details
-    print("\nAnalysis Results (with Reflection):")
-    print(json.dumps(json.loads(response.data.model_dump_json()), indent=2))
-    
-    return response.data
-
-def handle_questions():
+async def handle_questions(query: str, context: str = "") -> Dict:
     """Handle asking questions about the knowledge base with reflection"""
-    while True:
-        clear_screen()
-        print("\n=== Ask Questions About Knowledge Base ===")
-        print("\nOptions:")
-        print("1. Ask a question")
-        print("2. Return to main menu")
+    try:
+        response = await analyze_with_reflection(query, context)
         
-        choice = input("\nSelect an option (1-2): ")
+        # Format response as a dictionary
+        formatted_response = {
+            "reflection": {
+                "understanding": response.reflection.understanding,
+                "confidence": response.reflection.confidence,
+                "needs_clarification": response.reflection.needs_clarification,
+                "follow_up_questions": response.reflection.follow_up_questions,
+                "search_strategy": response.reflection.search_strategy
+            },
+            "findings": response.findings,
+            "evidence": response.evidence,
+            "confidence": response.confidence,
+            "recommendations": response.recommendations,
+            "limitations": response.limitations
+        }
         
-        if choice == "1":
-            query = input("\nEnter your question: ")
-            context = input("\nOptional - Provide any additional context: ")
-            
-            try:
-                response = analyze_with_reflection(query, context)
-                
-                # Display reflection process
-                print("\n=== Analysis Process ===")
-                print(f"\nQuery Understanding:")
-                print(f"- {response.reflection.understanding}")
-                print(f"- Confidence: {response.reflection.confidence:.2f}")
-                
-                if response.reflection.needs_clarification:
-                    print("\nClarification Needed:")
-                    for q in response.reflection.follow_up_questions:
-                        print(f"- {q}")
-                
-                print("\n=== Findings ===")
-                for topic, findings in response.findings.items():
-                    print(f"\n{topic}:")
-                    for finding in findings:
-                        print(f"- {finding}")
-                
-                if response.limitations:
-                    print("\nLimitations:")
-                    for limitation in response.limitations:
-                        print(f"- {limitation}")
-                
-                if response.recommendations:
-                    print("\nRecommendations:")
-                    for rec in response.recommendations:
-                        print(f"- {rec}")
-                
-            except Exception as e:
-                print(f"\nError during analysis: {e}")
-            
-            input("\nPress Enter to continue...")
-        elif choice == "2":
-            return
-        else:
-            print("\nInvalid option")
-            input("\nPress Enter to continue...")
+        return formatted_response
+        
+    except Exception as e:
+        print(f"\nError during analysis: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
 
-def add_document(file_path: str):
+async def add_document(file_path: str):
     """Add a document to the vector database"""
     if not os.path.exists(file_path):
         print(f"Error: File {file_path} does not exist")
@@ -219,7 +198,7 @@ def add_document(file_path: str):
         print(f"\nFailed to add {file_path} to the vector database")
         return False
 
-def list_documents():
+async def list_documents():
     """List all documents in the vector database"""
     files = list_files_in_db()
     if files:
@@ -231,7 +210,7 @@ def list_documents():
         print("\nNo files found in vector database")
         return []
 
-def remove_document(file_name: str):
+async def remove_document(file_name: str):
     """Remove a document from the vector database"""
     if remove_file_from_db(file_name):
         print(f"\nSuccessfully removed {file_name} from the vector database")
@@ -244,7 +223,7 @@ def clear_screen():
     """Clear the terminal screen"""
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def print_menu():
+async def print_menu():
     """Print the main menu"""
     clear_screen()
     print("\n===  FC RAG Knowledge Base ===")
@@ -254,16 +233,11 @@ def print_menu():
     print("4. Exit")
     print("\nSelect an option (1-4): ")
 
-def handle_add_file():
+async def handle_add_file():
     """Handle adding a file to the knowledge base"""
     while True:
-        clear_screen()
-        print("\n=== Add File to Knowledge Base ===")
-        print("\nOptions:")
-        print("1. Add a file")
-        print("2. Return to main menu")
-        
-        choice = input("\nSelect an option (1-2): ")
+        await print_menu()
+        choice = input("\nSelect an option (1-4): ")
         
         if choice == "1":
             # Get file path
@@ -296,12 +270,12 @@ def handle_add_file():
             print("\nInvalid option")
             input("\nPress Enter to continue...")
 
-def handle_list_and_remove():
+async def handle_list_and_remove():
     """Handle listing and removing files"""
     while True:
         clear_screen()
         print("\n=== List and Remove Files ===")
-        files = list_documents()
+        files = list_files_in_db()
         
         if not files:
             input("\nPress Enter to return to main menu...")
@@ -321,7 +295,7 @@ def handle_list_and_remove():
                     file_to_remove = files[file_num - 1]
                     confirm = input(f"\nAre you sure you want to remove '{file_to_remove}'? (y/n): ")
                     if confirm.lower() == 'y':
-                        if remove_document(file_to_remove):
+                        if remove_file_from_db(file_to_remove):
                             print(f"\nSuccessfully removed {file_to_remove}")
                         else:
                             print(f"\nFailed to remove {file_to_remove}")
@@ -340,18 +314,23 @@ def handle_list_and_remove():
             print("\nInvalid option")
             input("\nPress Enter to continue...")
 
-def main():
+async def main():
     """Main interactive menu loop"""
     while True:
-        print_menu()
+        await print_menu()
         choice = input().strip()
         
         if choice == "1":
-            handle_add_file()
+            await handle_add_file()
         elif choice == "2":
-            handle_list_and_remove()
+            await handle_list_and_remove()
         elif choice == "3":
-            handle_questions()
+            query = input("\nEnter your question: ")
+            context = input("\nOptional - Provide any additional context: ")
+            response = await handle_questions(query, context)
+            print("\nResponse:")
+            print(json.dumps(response, indent=2, ensure_ascii=False))
+            input("\nPress Enter to continue...")
         elif choice == "4":
             print("\nGoodbye!")
             break
@@ -360,4 +339,4 @@ def main():
             input("\nPress Enter to continue...")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
