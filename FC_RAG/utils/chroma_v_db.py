@@ -11,7 +11,7 @@ from pytesseract import image_to_string
 from PIL import Image
 import PyPDF2
 from io import BytesIO
-from typing import List
+from typing import List, Dict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -305,6 +305,61 @@ def query_vector_db(query_text=None, ctx=None):
         print(f"Full traceback: {traceback.format_exc()}")
         return json.dumps({"results": {"documents": [], "metadata": [], "distances": []}, "query": str(query_text)})
 
+# Display search results
+def display_results(results: Dict):
+    """Display search results in a readable format"""
+    if not results:
+        print("\nNo results found")
+        return
+        
+    print("\nSearch Results:\n")
+    
+    for i, (doc, meta, dist) in enumerate(zip(
+        results["results"]["documents"],
+        results["results"]["metadata"],
+        results["results"]["distances"]
+    ), 1):
+        print(f"\n=== Result {i} (Relevance: {(1-dist)*100:.1f}%) ===\n")
+        print(f"From chunk {meta['chunk_index']+1} of {meta['total_chunks']}")
+        print("-" * 80)
+        print(doc)
+        print("-" * 80)
+    
+    print("\nEnd of results")
+    input("\nPress Enter to continue...")
+
+# Display content chunks
+def display_chunks(chunks):
+    """Display the content chunks in a readable format"""
+    if not chunks:
+        print("\nNo chunks found")
+        return
+    
+    print("\nContent Chunks:\n")
+    
+    for i, chunk in enumerate(chunks, 1):
+        print(f"\n=== Chunk {i} ===")
+        print("-" * 80)
+        
+        # Handle both list and dictionary formats
+        if isinstance(chunk, dict):
+            # Print metadata if available
+            if 'metadata' in chunk:
+                print("Metadata:")
+                for key, value in chunk['metadata'].items():
+                    print(f"{key}: {value}")
+                print("\nContent:")
+            
+            # Get content from either 'document' or 'content' key
+            content = chunk.get('document', chunk.get('content', ''))
+            print(content)
+        else:
+            print(chunk)
+        
+        print("-" * 80)
+    
+    input("\nPress Enter to continue...")
+
 # Get related content chunks
 def get_file_chunks(file_name: str):
     """
@@ -422,11 +477,37 @@ def remove_file_from_db(file_name: str) -> bool:
         print(f"Error removing file from database: {e}")
         return False
 
+def validate_file(file_path: str) -> tuple[bool, str]:
+    """
+    Validate if the file exists and has an allowed extension
+    Returns: (is_valid: bool, error_message: str)
+    """
+    if not os.path.exists(file_path):
+        return False, "File does not exist"
+        
+    # Get file extension (convert to lowercase)
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+    
+    # Define allowed extensions
+    allowed_extensions = {'.txt', '.pdf'}
+    
+    if ext not in allowed_extensions:
+        return False, f"Unsupported file type. Allowed types: {', '.join(allowed_extensions)}"
+    
+    return True, ""
+
 # Main function to process files and store embeddings
 def process_file(file_path):
     """Process a file and store its embeddings in the vector database"""
     try:
         print(f"\nProcessing file: {file_path}")
+        
+        # Validate the file
+        is_valid, error_message = validate_file(file_path)
+        if not is_valid:
+            print(f"Error: {error_message}")
+            return None
         
         # Extract text from file
         text = extract_text_from_file(file_path)
@@ -470,6 +551,61 @@ def process_file(file_path):
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
+def handle_view_contents():
+    """Handle viewing the contents of the vector database"""
+    while True:
+        print("\n=== Vector Database Contents ===")
+        
+        contents = get_db_contents()
+        if not contents:
+            print("\nNo contents found in database or error occurred")
+            input("\nPress Enter to return to main menu...")
+            return
+        
+        print(f"\nTotal Documents: {contents['total_documents']}")
+        
+        if contents['documents']:
+            print("\nOptions:")
+            print("1. View document list")
+            print("2. View document details")
+            print("3. Return to main menu")
+            
+            choice = input("\nSelect an option (1-3): ")
+            
+            if choice == "1":
+                print("\nDocument List:")
+                for i, doc in enumerate(contents['documents'], 1):
+                    file_name = doc['metadata'].get('file_name', 'Unknown')
+                    print(f"{i}. {file_name}")
+                input("\nPress Enter to continue...")
+                
+            elif choice == "2":
+                print("\nEnter the number of the document to view details (1-{len(contents['documents'])})")
+                try:
+                    doc_num = int(input()) - 1
+                    if 0 <= doc_num < len(contents['documents']):
+                        doc = contents['documents'][doc_num]
+                        print("\nDocument Details:")
+                        print(f"ID: {doc['id']}")
+                        print(f"File Name: {doc['metadata'].get('file_name', 'Unknown')}")
+                        print(f"Hash: {doc['metadata'].get('file_hash', 'Unknown')}")
+                        print("\nContent Preview (first 200 characters):")
+                        print(doc['text'][:200] + "..." if len(doc['text']) > 200 else doc['text'])
+                    else:
+                        print("\nInvalid document number")
+                except ValueError:
+                    print("\nInvalid input")
+                input("\nPress Enter to continue...")
+                
+            elif choice == "3":
+                return
+            else:
+                print("\nInvalid option")
+                input("\nPress Enter to continue...")
+        else:
+            print("\nNo documents found in the database")
+            input("\nPress Enter to return to main menu...")
+
 # Example usage
 if __name__ == "__main__":
     file_paths = ["example.pdf", "example.txt"]  # Replace with paths to your files
@@ -479,6 +615,7 @@ if __name__ == "__main__":
     # Query example
     query_result = query_vector_db("Is there any termite?")
     print("Query Results:", json.dumps(query_result, indent=2))
+    display_results(json.loads(query_result))
     # if query_result and 'documents' in query_result:
     #     for document in query_result['documents']:
     #         print(document)

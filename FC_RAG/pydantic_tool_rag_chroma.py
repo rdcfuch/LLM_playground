@@ -13,7 +13,10 @@ from utils.chroma_v_db import (
     get_db_contents,
     collection,
     client as openai_client,
-    EMBEDDING_MODEL
+    EMBEDDING_MODEL,
+    display_results,
+    display_chunks,
+    validate_file
 )
 
 # Set environment variable to ignore Logfire warnings
@@ -248,192 +251,50 @@ def print_menu():
     print("\n1. Add File to Knowledge Base")
     print("2. List and Remove Files")
     print("3. Ask Questions About Knowledge Base")
-    print("4. View Database Contents")
-    print("5. Exit")
-    print("\nSelect an option (1-5): ")
-
-def handle_view_contents():
-    """Handle viewing the contents of the vector database"""
-    while True:
-        clear_screen()
-        print("\n=== Vector Database Contents ===")
-        
-        contents = get_db_contents()
-        if not contents:
-            print("\nNo contents found in database or error occurred")
-            input("\nPress Enter to return to main menu...")
-            return
-        
-        print(f"\nTotal Documents: {contents['total_documents']}")
-        
-        if contents['documents']:
-            print("\nOptions:")
-            print("1. View document list")
-            print("2. View document details")
-            print("3. Return to main menu")
-            
-            choice = input("\nSelect an option (1-3): ")
-            
-            if choice == "1":
-                print("\nDocument List:")
-                for i, doc in enumerate(contents['documents'], 1):
-                    file_name = doc['metadata'].get('file_name', 'Unknown')
-                    print(f"{i}. {file_name}")
-                input("\nPress Enter to continue...")
-                
-            elif choice == "2":
-                print("\nEnter the number of the document to view details (1-{len(contents['documents'])})")
-                try:
-                    doc_num = int(input()) - 1
-                    if 0 <= doc_num < len(contents['documents']):
-                        doc = contents['documents'][doc_num]
-                        print("\nDocument Details:")
-                        print(f"ID: {doc['id']}")
-                        print(f"File Name: {doc['metadata'].get('file_name', 'Unknown')}")
-                        print(f"Hash: {doc['metadata'].get('file_hash', 'Unknown')}")
-                        print("\nContent Preview (first 200 characters):")
-                        print(doc['text'][:200] + "..." if len(doc['text']) > 200 else doc['text'])
-                    else:
-                        print("\nInvalid document number")
-                except ValueError:
-                    print("\nInvalid input")
-                input("\nPress Enter to continue...")
-                
-            elif choice == "3":
-                return
-            else:
-                print("\nInvalid option")
-                input("\nPress Enter to continue...")
-        else:
-            print("\nNo documents found in the database")
-            input("\nPress Enter to return to main menu...")
-            return
-
-def validate_file(file_path: str) -> tuple[bool, str]:
-    """
-    Validate if the file exists and has an allowed extension
-    Returns: (is_valid: bool, error_message: str)
-    """
-    ALLOWED_EXTENSIONS = {'.txt', '.pdf'}
-    if not os.path.exists(file_path):
-        return False, f"File not found: {file_path}"
-    
-    file_ext = os.path.splitext(file_path)[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        return False, f"Unsupported file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
-    
-    return True, ""
-
-def display_chunks(chunks):
-    """Display the content chunks in a readable format"""
-    if not chunks:
-        print("\nNo chunks found")
-        return
-        
-    print(f"\nTotal chunks: {len(chunks)}")
-    print("\nContent Chunks:")
-    
-    def decode_text(text):
-        """Helper function to decode text that might be Unicode escaped"""
-        if isinstance(text, str):
-            try:
-                # First try to decode as UTF-8
-                return text.encode('utf-8').decode('utf-8')
-            except (UnicodeEncodeError, UnicodeDecodeError):
-                try:
-                    # If that fails, try to decode Unicode escapes
-                    return text.encode().decode('unicode-escape')
-                except (UnicodeEncodeError, UnicodeDecodeError):
-                    return text
-        return str(text)
-    
-    # Handle both list and dict formats
-    if isinstance(chunks, list):
-        for i, chunk in enumerate(chunks, 1):
-            print(f"\n=== Chunk {i} ===\n")
-            if isinstance(chunk, str):
-                print(decode_text(chunk))
-            elif isinstance(chunk, dict) and 'text' in chunk:
-                print(decode_text(chunk['text']))
-            else:
-                print(chunk)
-    else:
-        for i, chunk in enumerate(chunks['documents'], 1):
-            print(f"\n=== Chunk {i} ===\n")
-            if isinstance(chunk, str):
-                print(decode_text(chunk))
-            elif isinstance(chunk, dict) and 'text' in chunk:
-                print(decode_text(chunk['text']))
-            else:
-                print(chunk)
-            
-    input("\nPress Enter to continue...")
-
-def display_results(results: Dict):
-    """Display search results in a readable format"""
-    if not results:
-        print("\nNo results found")
-        return
-        
-    print("\nSearch Results:\n")
-    
-    for i, (doc, meta, dist) in enumerate(zip(
-        results["results"]["documents"],
-        results["results"]["metadata"],
-        results["results"]["distances"]
-    ), 1):
-        print(f"\n=== Result {i} (Relevance: {(1-dist)*100:.1f}%) ===\n")
-        print(f"From chunk {meta['chunk_index']+1} of {meta['total_chunks']}")
-        print("-" * 80)
-        print(doc)
-        print("-" * 80)
-    
-    print("\nEnd of results")
-    input("\nPress Enter to continue...")
+    print("4. Exit")
+    print("\nSelect an option (1-4): ")
 
 def handle_add_file():
     """Handle adding a file to the knowledge base"""
     while True:
         clear_screen()
         print("\n=== Add File to Knowledge Base ===")
-        print(f"\nSupported file types: {', '.join({'.txt', '.pdf'})}")
+        print("\nOptions:")
+        print("1. Add a file")
+        print("2. Return to main menu")
         
-        file_path = input("\nEnter the path to the file (or 'back' to return): ")
+        choice = input("\nSelect an option (1-2): ")
         
-        if file_path.lower() == 'back':
-            return
-        
-        # Validate file
-        is_valid, error_message = validate_file(file_path)
-        if not is_valid:
-            print(f"\nError: {error_message}")
-            input("\nPress Enter to try again...")
-            continue
-        
-        # Try to process the file
-        try:
-            print(f"\nProcessing {file_path}...")
-            chunks = process_file(file_path)
+        if choice == "1":
+            # Get file path
+            file_path = input("\nEnter the path to the file: ")
             
-            if chunks:
-                print(f"\nSuccessfully added {file_path} to the knowledge base")
+            try:
+                # Process file and get chunks
+                chunks = process_file(file_path)
                 
-                # Show the embedded chunks
-                print("\n=== Embedded Content Chunks ===")
-                display_chunks(chunks)
+                if chunks:
+                    print(f"\nSuccessfully added {file_path} to the knowledge base")
+                    
+                    # Show current files in database
+                    print("\nCurrent files in knowledge base:")
+                    files = list_files_in_db()
+                    for i, file in enumerate(files, 1):
+                        print(f"{i}. {file}")
+                    
+                else:
+                    print(f"\nFailed to add {file_path} to the knowledge base")
                 
-                # Show current files in database
-                print("\nCurrent files in knowledge base:")
-                files = list_files_in_db()
-                for i, file in enumerate(files, 1):
-                    print(f"{i}. {file}")
-            else:
-                print(f"\nFailed to add {file_path} to the knowledge base")
-        except Exception as e:
-            print(f"\nError processing file: {str(e)}")
-        
-        input("\nPress Enter to continue...")
-        break
+            except Exception as e:
+                print(f"\nError processing file: {e}")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "2":
+            return
+        else:
+            print("\nInvalid option")
+            input("\nPress Enter to continue...")
 
 def handle_list_and_remove():
     """Handle listing and removing files"""
@@ -492,8 +353,6 @@ def main():
         elif choice == "3":
             handle_questions()
         elif choice == "4":
-            handle_view_contents()
-        elif choice == "5":
             print("\nGoodbye!")
             break
         else:
