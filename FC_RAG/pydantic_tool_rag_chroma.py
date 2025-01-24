@@ -23,57 +23,159 @@ model = OpenAIModel(
 )
 
 class QueryInput(BaseModel):
-    query: str = Field(description="The search query to look for termite-related information")
+    query: str = Field(description="The search query to look for information in documents")
+    context: Optional[str] = Field(default="", description="Additional context for the query")
 
 class SearchResult(BaseModel):
     results: Dict = Field(description="Search results from the vector database")
     query: str = Field(description="The query that was searched for")
 
-# Define response model
-class TermiteAnalysisResponse(BaseModel):
-    has_termites: bool = Field(description="Whether termites are present")
+class ReflectionThoughts(BaseModel):
+    """Model for agent's self-reflection thoughts"""
+    understanding: str = Field(description="Agent's understanding of the query")
+    search_strategy: str = Field(description="Strategy for searching the documents")
+    confidence: float = Field(description="Confidence in understanding (0-1)")
+    needs_clarification: bool = Field(description="Whether clarification is needed")
+    follow_up_questions: List[str] = Field(default_factory=list, description="Potential follow-up questions")
+
+class AnalysisResponse(BaseModel):
+    """Enhanced response model with self-reflection"""
+    reflection: ReflectionThoughts = Field(description="Agent's self-reflection on the analysis")
+    findings: Dict[str, List[str]] = Field(description="Key findings from the documents")
+    evidence: List[str] = Field(default_factory=list, description="Evidence supporting the findings")
     confidence: float = Field(description="Confidence level of the analysis (0-1)")
-    evidence: List[str] = Field(default_factory=list, description="Evidence supporting the conclusion")
     recommendations: List[str] = Field(default_factory=list, description="Recommended actions")
+    limitations: List[str] = Field(default_factory=list, description="Limitations of the analysis")
 
-def analyze_document(query_text: str):
-    """Analyze a document using the agent"""
-    # First, let's directly query the vector database to see the results
-    print("\nQuerying vector database directly:")
-    results = query_vector_db(query_text)
-    print("\nRetrieval Results:")
-    print(json.dumps(json.loads(results), indent=2))
-
-    # Agent with structured output
-    agent5 = Agent(
+def analyze_with_reflection(query_text: str, context: str = ""):
+    """Analyze documents with self-reflection capabilities"""
+    
+    # Initialize agent with enhanced prompt for self-reflection
+    agent = Agent(
         model=model,
-        result_type=TermiteAnalysisResponse,
+        result_type=AnalysisResponse,
         deps_type=QueryInput,
         retries=3,
         system_prompt=(
-            "You are an expert termite inspector analyzing documents for evidence of termite presence.\n"
-            "Use the query_vector_db tool to search through inspection reports and documents.\n"
-            "The tool will return a JSON string that you should parse to analyze the results.\n"
-            "Analyze the search results and provide a structured response that includes:\n"
-            "1. Whether termites are present (true/false)\n"
-            "2. Your confidence level (0-1)\n"
-            "3. Specific evidence found in the documents\n"
-            "4. Practical recommendations based on the findings\n"
-            "Always maintain a professional and analytical tone."
+            "You are an expert document analyzer with advanced self-reflection capabilities.\n"
+            "Follow these steps for each analysis:\n\n"
+            "1. REFLECT - Before searching:\n"
+            "   - Understand the query deeply\n"
+            "   - Consider what information you need\n"
+            "   - Plan your search strategy\n\n"
+            "2. SEARCH - Use the query_vector_db tool to find relevant information\n\n"
+            "3. ANALYZE - Process the search results:\n"
+            "   - Look for direct evidence\n"
+            "   - Consider context and implications\n"
+            "   - Note any limitations or gaps\n\n"
+            "4. REFLECT AGAIN - After analysis:\n"
+            "   - Assess confidence in findings\n"
+            "   - Consider alternative interpretations\n"
+            "   - Identify follow-up questions\n\n"
+            "5. RESPOND - Provide structured output:\n"
+            "   - Include your reflection process\n"
+            "   - Support findings with evidence\n"
+            "   - Note confidence levels and limitations\n"
+            "   - Suggest next steps or recommendations\n\n"
+            "If you encounter unclear or ambiguous queries, raise a ModelRetry with specific clarification needs."
         ),
         tools=[Tool(query_vector_db, takes_ctx=True)],
     )
 
-    # Run analysis
-    query = QueryInput(query=query_text)
-    response = agent5.run_sync(
-        user_prompt="Please analyze the documents for any evidence of termites.",
+    @agent.tool_plain()
+    def refine_search(initial_results: str, focus_area: str) -> str:
+        """Refine the search based on initial results and a specific focus area."""
+        try:
+            # Parse initial results
+            results = json.loads(initial_results)
+            if not results.get("results", {}).get("documents"):
+                raise ModelRetry(
+                    "No relevant documents found. Consider:\n"
+                    "1. Broadening the search terms\n"
+                    "2. Checking if documents are properly loaded\n"
+                    "3. Using alternative keywords"
+                )
+            
+            # Perform refined search
+            refined_query = f"{query_text} {focus_area}"
+            refined_results = query_vector_db(refined_query)
+            return refined_results
+            
+        except json.JSONDecodeError:
+            raise ModelRetry("Error parsing search results. Please try a different search approach.")
+
+    # First, query the vector database
+    print("\nInitial Search Results:")
+    results = query_vector_db(query_text)
+    print(json.dumps(json.loads(results), indent=2))
+
+    # Run analysis with reflection
+    query = QueryInput(query=query_text, context=context)
+    response = agent.run_sync(
+        user_prompt=f"Analyze the following query with self-reflection: {query_text}",
         deps=query
     )
 
-    # Print results
-    print("\nAnalysis Results:")
-    print(response.data.model_dump_json(indent=2))
+    # Print results with reflection details
+    print("\nAnalysis Results (with Reflection):")
+    print(json.dumps(json.loads(response.data.model_dump_json()), indent=2))
+    
+    return response.data
+
+def handle_questions():
+    """Handle asking questions about the knowledge base with reflection"""
+    while True:
+        clear_screen()
+        print("\n=== Ask Questions About Knowledge Base ===")
+        print("\nOptions:")
+        print("1. Ask a question")
+        print("2. Return to main menu")
+        
+        choice = input("\nSelect an option (1-2): ")
+        
+        if choice == "1":
+            query = input("\nEnter your question: ")
+            context = input("\nOptional - Provide any additional context: ")
+            
+            try:
+                response = analyze_with_reflection(query, context)
+                
+                # Display reflection process
+                print("\n=== Analysis Process ===")
+                print(f"\nQuery Understanding:")
+                print(f"- {response.reflection.understanding}")
+                print(f"- Confidence: {response.reflection.confidence:.2f}")
+                
+                if response.reflection.needs_clarification:
+                    print("\nClarification Needed:")
+                    for q in response.reflection.follow_up_questions:
+                        print(f"- {q}")
+                
+                print("\n=== Findings ===")
+                for topic, findings in response.findings.items():
+                    print(f"\n{topic}:")
+                    for finding in findings:
+                        print(f"- {finding}")
+                
+                if response.limitations:
+                    print("\nLimitations:")
+                    for limitation in response.limitations:
+                        print(f"- {limitation}")
+                
+                if response.recommendations:
+                    print("\nRecommendations:")
+                    for rec in response.recommendations:
+                        print(f"- {rec}")
+                
+            except Exception as e:
+                print(f"\nError during analysis: {e}")
+            
+            input("\nPress Enter to continue...")
+        elif choice == "2":
+            return
+        else:
+            print("\nInvalid option")
+            input("\nPress Enter to continue...")
 
 def add_document(file_path: str):
     """Add a document to the vector database"""
@@ -162,27 +264,6 @@ def handle_list_and_remove():
             except ValueError:
                 print("\nInvalid input")
                 input("\nPress Enter to continue...")
-        elif choice == "2":
-            return
-        else:
-            print("\nInvalid option")
-            input("\nPress Enter to continue...")
-
-def handle_questions():
-    """Handle asking questions about the knowledge base"""
-    while True:
-        clear_screen()
-        print("\n=== Ask Questions About Knowledge Base ===")
-        print("\nOptions:")
-        print("1. Ask a question")
-        print("2. Return to main menu")
-        
-        choice = input("\nSelect an option (1-2): ")
-        
-        if choice == "1":
-            query = input("\nEnter your question: ")
-            analyze_document(query)
-            input("\nPress Enter to continue...")
         elif choice == "2":
             return
         else:
