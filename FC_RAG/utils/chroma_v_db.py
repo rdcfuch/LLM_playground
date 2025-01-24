@@ -3,24 +3,28 @@ import json
 import os
 import uuid
 from dotenv import load_dotenv
-import pdfplumber
-from openai import OpenAI
 import chromadb
 from chromadb.config import Settings
+from openai import OpenAI
+import traceback
+import pdfplumber
 from pytesseract import image_to_string
 from PIL import Image
 import PyPDF2
 from io import BytesIO
 from typing import List, Dict
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Configuration
+# Constants
+VECTOR_DB_DIR = "vector_db"
+CHUNK_SIZE = 1000  # characters
+CHUNK_OVERLAP = 200  # characters
 EMBEDDING_MODEL = "text-embedding-ada-002"
-CHUNK_SIZE = 500  # Reduced chunk size for better handling
-CHUNK_OVERLAP = 100  # Reduced overlap but maintained proportion
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Get absolute path for vector database
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,28 +35,28 @@ VECTOR_DB_DIR = os.path.join(PROJECT_DIR, "FC_RAG", "vector_db")
 os.makedirs(VECTOR_DB_DIR, exist_ok=True)
 print(f"Vector database directory: {VECTOR_DB_DIR}")
 
-# Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Initialize vector database with persistence
-chroma_client = chromadb.PersistentClient(
-    path=VECTOR_DB_DIR,
-    settings=Settings(
-        anonymized_telemetry=False,
-        is_persistent=True,
-        allow_reset=True,
-    )
-)
-
-# Get or create collection with proper encoding settings
-collection = chroma_client.get_or_create_collection(
-    name="file_embeddings_v2",
-    metadata={
-        "hnsw:space": "cosine",  # Use cosine similarity
-        "encoding": "utf-8"  # Explicitly set UTF-8 encoding
-    }
-)
-
+class ChromaVectorStore:
+    def __init__(self):
+        # Initialize vector database with persistence
+        self.chroma_client = chromadb.PersistentClient(
+            path=VECTOR_DB_DIR,
+            settings=Settings(
+                anonymized_telemetry=False,
+                is_persistent=True,
+                allow_reset=True,
+            )
+        )
+        
+        # Get or create collection
+        self.collection = self.chroma_client.get_or_create_collection(
+            name="file_embeddings_v2",
+            metadata={
+                "hnsw:space": "cosine",  # Use cosine similarity
+            }
+        )
+    
+    def get_collection(self):
+        return self.collection
 
 # Extract text from PDF
 def extract_text_from_pdf(pdf_path):
@@ -180,25 +184,56 @@ def compute_file_hash(file_path):
 
 # Generate vector embeddings
 def generate_embeddings(text_chunks):
+    """
+    Generate embeddings for text chunks using OpenAI's API
+    Args:
+        text_chunks: List of text chunks to generate embeddings for
+    Returns:
+        list: List of embeddings or None if error
+    """
+    if not text_chunks:
+        print("Error: No text chunks provided")
+        return None
+        
     embeddings = []
     try:
         for chunk in text_chunks:
-            response = client.embeddings.create(
-                input=chunk,
-                model=EMBEDDING_MODEL,
-            )
-            embeddings.append(response.data[0].embedding)
+            if not isinstance(chunk, str):
+                print(f"Error: Invalid chunk type {type(chunk)}")
+                continue
+                
+            if not chunk.strip():
+                print("Warning: Empty chunk, skipping")
+                continue
+                
+            try:
+                response = client.embeddings.create(
+                    input=chunk,
+                    model=EMBEDDING_MODEL,
+                )
+                embeddings.append(response.data[0].embedding)
+            except Exception as e:
+                print(f"Error generating embedding for chunk: {str(e)}")
+                continue
+                
+        if not embeddings:
+            print("Error: No embeddings were generated")
+            return None
+            
+        return embeddings
+        
     except Exception as e:
-        print(f"Error generating embeddings: {e}")
-    return embeddings
+        print(f"Error in generate_embeddings: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
 
 
 # Store embeddings in the vector database
-def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash):
+def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash, vector_store):
     """Store embeddings in the vector database"""
     try:
         # First, remove any existing entries for this file
-        collection.delete(where={"file_name": file_name})
+        vector_store.get_collection().delete(where={"file_name": file_name})
         
         # Prepare the data
         ids = [str(uuid.uuid4()) for _ in range(len(text_chunks))]
@@ -220,7 +255,7 @@ def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash):
             encoded_chunks.append(normalized)
         
         # Store the chunks and their embeddings
-        collection.add(
+        vector_store.get_collection().add(
             ids=ids,
             embeddings=embeddings,
             documents=encoded_chunks,
@@ -239,12 +274,13 @@ def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash):
 
 
 # Query the vector database
-def query_vector_db(query_text=None, ctx=None):
+def query_vector_db(query_text=None, ctx=None, vector_store=None):
     """
     Query the vector database for relevant documents
     Args:
         query_text: Text to search for
         ctx: RunContext object from pydantic_ai
+        vector_store: ChromaVectorStore instance
     Returns:
         str: JSON string with search results
     """
@@ -271,13 +307,13 @@ def query_vector_db(query_text=None, ctx=None):
         print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
         
         # Get collection info
-        collection_items = collection.get()
+        collection_items = vector_store.get_collection().get()
         print(f"\nDebug - Collection info:")
         print(f"Number of items: {len(collection_items.get('ids', []))}")
         print(f"Available metadata: {collection_items.get('metadatas', [])}")
         
         # Query the collection
-        results = collection.query(
+        results = vector_store.get_collection().query(
             query_embeddings=[query_embedding],
             n_results=5,
             include=["documents", "metadatas", "distances"]
@@ -361,46 +397,54 @@ def display_chunks(chunks):
     input("\nPress Enter to continue...")
 
 # Get related content chunks
-def get_file_chunks(file_name: str):
+def get_file_chunks(file_name: str, vector_store):
     """
     Get all content chunks for a specific file
     Args:
         file_name: Name of the file to get chunks for
+        vector_store: ChromaVectorStore instance
     Returns:
         list: List of chunks and their metadata
     """
     try:
         # Query the collection for all chunks of this file
-        results = collection.get(
+        results = vector_store.get_collection().get(
             where={"file_name": file_name}
         )
         
         if not results or "documents" not in results:
             return []
             
-        # Sort chunks by index
-        chunks_with_index = [
-            (chunk, meta.get("chunk_index", 0))
-            for chunk, meta in zip(results["documents"], results["metadatas"])
-        ]
-        chunks_with_index.sort(key=lambda x: x[1])  # Sort by chunk_index
-        
-        # Return just the chunks in order
-        return [chunk for chunk, _ in chunks_with_index]
+        # Combine documents and metadata
+        chunks = []
+        for i, (text, metadata) in enumerate(zip(results["documents"], results["metadatas"])):
+            chunks.append({
+                "id": i + 1,
+                "text": text,
+                "metadata": metadata
+            })
+            
+        # Sort chunks by index if available
+        chunks.sort(key=lambda x: x["metadata"].get("chunk_index", 0))
+        return chunks
         
     except Exception as e:
         print(f"Error getting file chunks: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return []
 
-def get_db_contents():
+def get_db_contents(vector_store):
     """
     Get all contents stored in the vector database
+    Args:
+        vector_store: ChromaVectorStore instance
     Returns:
         dict: A dictionary containing all documents and their metadata
     """
     try:
         # Get all items from the collection
-        results = collection.get()
+        results = vector_store.get_collection().get()
         
         if not results or "documents" not in results:
             return {
@@ -424,15 +468,17 @@ def get_db_contents():
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
-def list_files_in_db() -> List[str]:
+def list_files_in_db(vector_store):
     """
     List all unique files stored in the vector database
+    Args:
+        vector_store: ChromaVectorStore instance
     Returns:
         List[str]: List of unique file names
     """
     try:
         # Get all items in collection
-        collection_items = collection.get()
+        collection_items = vector_store.get_collection().get()
         
         # Get unique file names
         files = set()
@@ -446,17 +492,18 @@ def list_files_in_db() -> List[str]:
         print(f"Error listing files in database: {e}")
         return []
 
-def remove_file_from_db(file_name: str) -> bool:
+def remove_file_from_db(file_name: str, vector_store):
     """
     Remove a file and its embeddings from the vector database
     Args:
         file_name: Name of the file to remove (e.g., 'example.pdf')
+        vector_store: ChromaVectorStore instance
     Returns:
         bool: True if file was found and removed, False otherwise
     """
     try:
         # Get all items in collection
-        collection_items = collection.get()
+        collection_items = vector_store.get_collection().get()
         
         # Find all IDs associated with this file
         file_ids = []
@@ -469,7 +516,7 @@ def remove_file_from_db(file_name: str) -> bool:
             return False
             
         # Delete the embeddings
-        collection.delete(ids=file_ids)
+        vector_store.get_collection().delete(ids=file_ids)
         print(f"Successfully removed {len(file_ids)} embeddings for file: {file_name}")
         return True
         
@@ -477,28 +524,27 @@ def remove_file_from_db(file_name: str) -> bool:
         print(f"Error removing file from database: {e}")
         return False
 
-def validate_file(file_path: str) -> tuple[bool, str]:
+def validate_file(file_path: str):
     """
-    Validate if the file exists and has an allowed extension
+    Validate if the file has an allowed extension
     Returns: (is_valid: bool, error_message: str)
     """
-    if not os.path.exists(file_path):
-        return False, "File does not exist"
+    try:
+        # Check file extension
+        allowed_extensions = {'.txt', '.pdf'}
+        file_extension = os.path.splitext(file_path)[1].lower()
         
-    # Get file extension (convert to lowercase)
-    _, ext = os.path.splitext(file_path)
-    ext = ext.lower()
-    
-    # Define allowed extensions
-    allowed_extensions = {'.txt', '.pdf'}
-    
-    if ext not in allowed_extensions:
-        return False, f"Unsupported file type. Allowed types: {', '.join(allowed_extensions)}"
-    
-    return True, ""
+        if file_extension not in allowed_extensions:
+            return False, f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
+            
+        return True, ""
+        
+    except Exception as e:
+        print(f"Error validating file: {str(e)}")
+        return False, str(e)
 
 # Main function to process files and store embeddings
-def process_file(file_path):
+def process_file(file_path, vector_store):
     """Process a file and store its embeddings in the vector database"""
     try:
         print(f"\nProcessing file: {file_path}")
@@ -507,6 +553,10 @@ def process_file(file_path):
         is_valid, error_message = validate_file(file_path)
         if not is_valid:
             print(f"Error: {error_message}")
+            return None
+        
+        if not os.path.exists(file_path):
+            print(f"Error: File does not exist")
             return None
         
         # Extract text from file
@@ -538,10 +588,10 @@ def process_file(file_path):
         
         # Store in database
         file_name = os.path.basename(file_path)
-        store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash)
+        store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash, vector_store)
         
         # Get and return the stored chunks
-        chunks = get_file_chunks(file_name)
+        chunks = get_file_chunks(file_name, vector_store)
         print(f"\nDebug - Retrieved {len(chunks)} chunks from database")
         return chunks
         
@@ -551,12 +601,12 @@ def process_file(file_path):
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
-def handle_view_contents():
+def handle_view_contents(vector_store):
     """Handle viewing the contents of the vector database"""
     while True:
         print("\n=== Vector Database Contents ===")
         
-        contents = get_db_contents()
+        contents = get_db_contents(vector_store)
         if not contents:
             print("\nNo contents found in database or error occurred")
             input("\nPress Enter to return to main menu...")
@@ -608,12 +658,13 @@ def handle_view_contents():
 
 # Example usage
 if __name__ == "__main__":
+    vector_store = ChromaVectorStore()
     file_paths = ["example.pdf", "example.txt"]  # Replace with paths to your files
     for file_path in file_paths:
-        process_file(file_path)
+        process_file(file_path, vector_store)
 
     # Query example
-    query_result = query_vector_db("Is there any termite?")
+    query_result = query_vector_db("Is there any termite?", vector_store=vector_store)
     print("Query Results:", json.dumps(query_result, indent=2))
     display_results(json.loads(query_result))
     # if query_result and 'documents' in query_result:

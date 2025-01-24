@@ -6,3 +6,5 @@ chromadb
 pytesseract
 Pillow
 PyPDF2
+fastapi
+uvicorn
