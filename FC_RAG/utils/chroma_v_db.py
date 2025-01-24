@@ -19,7 +19,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Configuration
 EMBEDDING_MODEL = "text-embedding-ada-002"
-CHUNK_SIZE = 200
+CHUNK_SIZE = 500  # Reduced chunk size for better handling
+CHUNK_OVERLAP = 100  # Reduced overlap but maintained proportion
 
 # Get absolute path for vector database
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,13 +36,21 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize vector database with persistence
 chroma_client = chromadb.PersistentClient(
-    path=VECTOR_DB_DIR
+    path=VECTOR_DB_DIR,
+    settings=Settings(
+        anonymized_telemetry=False,
+        is_persistent=True,
+        allow_reset=True,
+    )
 )
 
-# Get or create collection
+# Get or create collection with proper encoding settings
 collection = chroma_client.get_or_create_collection(
     name="file_embeddings_v2",
-    metadata={"hnsw:space": "cosine"}  # Use cosine similarity
+    metadata={
+        "hnsw:space": "cosine",  # Use cosine similarity
+        "encoding": "utf-8"  # Explicitly set UTF-8 encoding
+    }
 )
 
 
@@ -74,27 +83,89 @@ def extract_text_via_ocr(pdf_path):
 
 # Extract text from file
 def extract_text_from_file(file_path):
-    """Extract text from PDF or text file"""
-    if file_path.lower().endswith('.pdf'):
+    """Extract text from PDF or text file with proper encoding handling"""
+    file_ext = os.path.splitext(file_path)[1].lower()
+    
+    if file_ext == '.pdf':
         return extract_text_from_pdf(file_path)
-    elif file_path.lower().endswith('.txt'):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except Exception as e:
-            print(f"Error reading text file: {e}")
-            return ""
+    elif file_ext == '.txt':
+        encodings = ['utf-8', 'gb18030', 'gbk', 'gb2312', 'big5']
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as file:
+                    text = file.read()
+                    # Verify the text is readable Chinese
+                    if any('\u4e00' <= char <= '\u9fff' for char in text):
+                        print(f"\nDebug - Successfully read with {encoding} encoding")
+                        print(f"Debug - Extracted text length: {len(text)} characters")
+                        print(f"Debug - First 100 chars: {text[:100]}")
+                        return text
+            except UnicodeDecodeError:
+                continue
+        raise ValueError(f"Could not decode file with any known Chinese encoding")
     else:
-        print(f"Unsupported file type: {file_path}")
-        return ""
+        raise ValueError(f"Unsupported file type: {file_ext}")
 
 
 # Split text into chunks
-def split_text(text, chunk_size=CHUNK_SIZE):
+def split_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
+    """
+    Split text into overlapping chunks of approximately equal size.
+    Args:
+        text: Text to split
+        chunk_size: Target size of each chunk in characters
+        overlap: Number of characters to overlap between chunks
+    Returns:
+        list: List of text chunks
+    """
+    if not text:
+        return []
+        
+    # Clean the text
+    text = text.strip().replace('\n\n', '。').replace('\n', '。')
+    print(f"\nDebug - Text length after cleaning: {len(text)} characters")
+    
+    # If text is shorter than chunk_size, return it as a single chunk
+    if len(text) <= chunk_size:
+        return [text]
+    
     chunks = []
-    words = text.split()
-    for i in range(0, len(words), chunk_size):
-        chunks.append(" ".join(words[i:i + chunk_size]))
+    start = 0
+    text_len = len(text)
+    
+    while start < text_len:
+        # Get a chunk of size chunk_size or until the end of text
+        end = min(start + chunk_size, text_len)
+        
+        # If we're not at the end of the text, try to find a good break point
+        if end < text_len:
+            # Look for the last occurrence of a sentence-ending punctuation
+            for punct in ['。', '！', '？', '. ', '! ', '? ']:
+                last_punct = text[start:end].rfind(punct)
+                if last_punct != -1:
+                    end = start + last_punct + len(punct)
+                    break
+        
+        # Add the chunk
+        chunk = text[start:end].strip()
+        if chunk:  # Only add non-empty chunks
+            chunks.append(chunk)
+            print(f"\nDebug - Added chunk {len(chunks)}, length: {len(chunk)} characters")
+            print(f"Debug - Chunk start: {chunk[:50]}...")
+            print(f"Debug - Chunk end: ...{chunk[-50:]}")
+        
+        # Move the start pointer, accounting for overlap
+        start = end - overlap if end < text_len else text_len
+    
+    # Post-process: ensure no duplicate chunks and no empty chunks
+    chunks = [chunk for chunk in chunks if chunk.strip()]
+    print(f"\nDebug - Final number of chunks: {len(chunks)}")
+    
+    # Verify we haven't lost any text
+    total_chars = sum(len(chunk) for chunk in chunks)
+    print(f"Debug - Total characters in chunks: {total_chars}")
+    print(f"Debug - Original text length: {len(text)}")
+    
     return chunks
 
 
@@ -125,37 +196,46 @@ def generate_embeddings(text_chunks):
 # Store embeddings in the vector database
 def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash):
     """Store embeddings in the vector database"""
-    print(f"\nDebug - Storing embeddings:")
-    print(f"File name: {file_name}")
-    print(f"Number of chunks: {len(text_chunks)}")
-    print(f"Number of embeddings: {len(embeddings)}")
-    print(f"File hash: {file_hash}")
-    
-    # Check if the file hash already exists in metadata
-    existing_ids = [
-        metadata["chunk_id"]
-        for metadata in collection.get()["metadatas"]
-        if metadata.get("file_hash") == file_hash
-    ]
-    if existing_ids:
-        print(f"Embeddings for {file_name} already exist in the database.")
-        return
-
-    ids = [str(uuid.uuid4()) for _ in range(len(text_chunks))]
-    metadatas = [{"file_name": file_name, "chunk_id": i, "file_hash": file_hash} for i in range(len(text_chunks))]
-    
-    print(f"\nDebug - Adding to collection:")
-    print(f"Collection name: {collection.name}")
-    print(f"Number of IDs: {len(ids)}")
-    print(f"Sample text chunk: {text_chunks[0][:100]}...")
-    
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        metadatas=metadatas,
-        documents=text_chunks,
-    )
-    print(f"Embeddings for {file_name} stored successfully!")
+    try:
+        # First, remove any existing entries for this file
+        collection.delete(where={"file_name": file_name})
+        
+        # Prepare the data
+        ids = [str(uuid.uuid4()) for _ in range(len(text_chunks))]
+        metadatas = [
+            {
+                "file_name": file_name,
+                "file_hash": file_hash,
+                "chunk_index": i,
+                "total_chunks": len(text_chunks)
+            }
+            for i in range(len(text_chunks))
+        ]
+        
+        # Ensure text chunks are properly encoded
+        encoded_chunks = []
+        for chunk in text_chunks:
+            # Normalize the text to ensure consistent encoding
+            normalized = chunk.encode('utf-8').decode('utf-8')
+            encoded_chunks.append(normalized)
+        
+        # Store the chunks and their embeddings
+        collection.add(
+            ids=ids,
+            embeddings=embeddings,
+            documents=encoded_chunks,
+            metadatas=metadatas
+        )
+        
+        print(f"\nDebug - Stored {len(encoded_chunks)} chunks for {file_name}")
+        print(f"Debug - First chunk preview: {encoded_chunks[0][:100]}")
+        
+        return True
+    except Exception as e:
+        print(f"Error storing embeddings: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return False
 
 
 # Query the vector database
@@ -225,48 +305,91 @@ def query_vector_db(query_text=None, ctx=None):
         print(f"Full traceback: {traceback.format_exc()}")
         return json.dumps({"results": {"documents": [], "metadata": [], "distances": []}, "query": str(query_text)})
 
-# Main function to process files and store embeddings
-def process_file(file_path):
-    """Process a file and store its embeddings in the vector database"""
+# Get related content chunks
+def get_file_chunks(file_name: str):
+    """
+    Get all content chunks for a specific file
+    Args:
+        file_name: Name of the file to get chunks for
+    Returns:
+        list: List of chunks and their metadata
+    """
     try:
-        print(f"\nDebug - Processing file: {file_path}")
+        # Query the collection for all chunks of this file
+        results = collection.get(
+            where={"file_name": file_name}
+        )
         
-        # Extract text from the file
-        text = extract_text_from_file(file_path)
-        print(f"Extracted text length: {len(text)}")
-        if not text:
-            print(f"No text could be extracted from {file_path}")
-            return False
+        if not results or "documents" not in results:
+            return []
             
-        # Generate a unique hash for the file content
-        file_hash = compute_file_hash(file_path)
-        print(f"Generated file hash: {file_hash}")
+        # Sort chunks by index
+        chunks_with_index = [
+            (chunk, meta.get("chunk_index", 0))
+            for chunk, meta in zip(results["documents"], results["metadatas"])
+        ]
+        chunks_with_index.sort(key=lambda x: x[1])  # Sort by chunk_index
         
-        # Split text into chunks
-        text_chunks = split_text(text)
-        print(f"Generated {len(text_chunks)} text chunks")
-        if not text_chunks:
-            print(f"No text chunks generated from {file_path}")
-            return False
-            
-        # Generate embeddings
-        embeddings = generate_embeddings(text_chunks)
-        print(f"Generated {len(embeddings)} embeddings")
-        if not embeddings:
-            print(f"Failed to generate embeddings for {file_path}")
-            return False
-            
-        # Store in vector database
-        store_embeddings_in_db(os.path.basename(file_path), text_chunks, embeddings, file_hash)
-        print(f"Successfully processed {file_path}")
-        return True
+        # Return just the chunks in order
+        return [chunk for chunk, _ in chunks_with_index]
         
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f"Error getting file chunks: {str(e)}")
+        return []
+
+def get_db_contents():
+    """
+    Get all contents stored in the vector database
+    Returns:
+        dict: A dictionary containing all documents and their metadata
+    """
+    try:
+        # Get all items from the collection
+        results = collection.get()
+        
+        if not results or "documents" not in results:
+            return {
+                "total_documents": 0,
+                "documents": []
+            }
+            
+        # Get the documents and their metadata
+        documents = results.get("documents", [])
+        metadatas = results.get("metadatas", [])
+        
+        # Return the documents directly
+        return {
+            "total_documents": len(documents),
+            "documents": documents
+        }
+        
+    except Exception as e:
+        print(f"Error getting database contents: {str(e)}")
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
-        return False
+        return None
 
+def list_files_in_db() -> List[str]:
+    """
+    List all unique files stored in the vector database
+    Returns:
+        List[str]: List of unique file names
+    """
+    try:
+        # Get all items in collection
+        collection_items = collection.get()
+        
+        # Get unique file names
+        files = set()
+        for metadata in collection_items.get("metadatas", []):
+            if metadata.get("file_name"):
+                files.add(metadata["file_name"])
+                
+        return sorted(list(files))
+        
+    except Exception as e:
+        print(f"Error listing files in database: {e}")
+        return []
 
 def remove_file_from_db(file_name: str) -> bool:
     """
@@ -299,27 +422,53 @@ def remove_file_from_db(file_name: str) -> bool:
         print(f"Error removing file from database: {e}")
         return False
 
-def list_files_in_db() -> List[str]:
-    """
-    List all unique files stored in the vector database
-    Returns:
-        List[str]: List of unique file names
-    """
+# Main function to process files and store embeddings
+def process_file(file_path):
+    """Process a file and store its embeddings in the vector database"""
     try:
-        # Get all items in collection
-        collection_items = collection.get()
+        print(f"\nProcessing file: {file_path}")
         
-        # Get unique file names
-        files = set()
-        for metadata in collection_items.get("metadatas", []):
-            if metadata.get("file_name"):
-                files.add(metadata["file_name"])
-                
-        return sorted(list(files))
+        # Extract text from file
+        text = extract_text_from_file(file_path)
+        if not text.strip():
+            print("Warning: Extracted text is empty")
+            return None
+            
+        print(f"\nDebug - Total extracted text length: {len(text)} characters")
+        
+        # Split text into chunks
+        text_chunks = split_text(text)
+        if not text_chunks:
+            print("Warning: No text chunks generated")
+            return None
+            
+        print(f"\nDebug - Generated {len(text_chunks)} chunks")
+        
+        # Generate embeddings
+        embeddings = generate_embeddings(text_chunks)
+        if not embeddings:
+            print("Warning: No embeddings generated")
+            return None
+            
+        print(f"\nDebug - Generated {len(embeddings)} embeddings")
+        
+        # Compute file hash
+        file_hash = compute_file_hash(file_path)
+        
+        # Store in database
+        file_name = os.path.basename(file_path)
+        store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash)
+        
+        # Get and return the stored chunks
+        chunks = get_file_chunks(file_name)
+        print(f"\nDebug - Retrieved {len(chunks)} chunks from database")
+        return chunks
         
     except Exception as e:
-        print(f"Error listing files in database: {e}")
-        return []
+        print(f"Error processing file: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
 
 # Example usage
 if __name__ == "__main__":

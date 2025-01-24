@@ -5,7 +5,16 @@ from pydantic_ai import Agent, ModelRetry, RunContext, Tool
 from pydantic_ai.models.openai import OpenAIModel
 import os
 import json
-from utils.chroma_v_db import query_vector_db, process_file, remove_file_from_db, list_files_in_db
+from utils.chroma_v_db import (
+    query_vector_db as chroma_query_db, 
+    process_file, 
+    remove_file_from_db, 
+    list_files_in_db, 
+    get_db_contents,
+    collection,
+    client as openai_client,
+    EMBEDDING_MODEL
+)
 
 # Set environment variable to ignore Logfire warnings
 os.environ["LOGFIRE_IGNORE_NO_CONFIG"] = "1"
@@ -47,68 +56,84 @@ class AnalysisResponse(BaseModel):
     recommendations: List[str] = Field(default_factory=list, description="Recommended actions")
     limitations: List[str] = Field(default_factory=list, description="Limitations of the analysis")
 
+# Initialize the agent at the module level
+agent = Agent(
+    model=model,
+    result_type=AnalysisResponse,
+    deps_type=QueryInput,
+    retries=3,
+    system_prompt=(
+        "You are an expert document analyzer with advanced self-reflection capabilities.\n"
+        "Follow these steps for each analysis:\n\n"
+        "1. REFLECT - Before searching:\n"
+        "   - Understand the query deeply\n"
+        "   - Consider what information you need\n"
+        "   - Plan your search strategy\n\n"
+        "2. SEARCH - Use the query_vector_db tool to find relevant information\n\n"
+        "3. ANALYZE - Process the search results:\n"
+        "   - Look for direct evidence\n"
+        "   - Consider context and implications\n"
+        "   - Note any limitations or gaps\n\n"
+        "4. REFLECT AGAIN - After analysis:\n"
+        "   - Assess confidence in findings\n"
+        "   - Consider alternative interpretations\n"
+        "   - Identify follow-up questions\n\n"
+        "5. RESPOND - Provide structured output:\n"
+        "   - Include your reflection process\n"
+        "   - Support findings with evidence\n"
+        "   - Note confidence levels and limitations\n"
+        "   - Suggest next steps or recommendations\n\n"
+        "If you encounter unclear or ambiguous queries, raise a ModelRetry with specific clarification needs."
+    )
+)
+
+@agent.tool()
+def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dict:
+    """Query the vector database with the given text query"""
+    try:
+        print(f"\nDebug - Query text: {query_text}")
+        
+        # Generate embedding for the query
+        query_response = openai_client.embeddings.create(
+            input=query_text,
+            model=EMBEDDING_MODEL,
+        )
+        query_embedding = query_response.data[0].embedding
+        print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
+        
+        # Get collection info
+        print("\nDebug - Collection info:")
+        print(f"Number of items: {collection.count()}")
+        print(f"Available metadata: {[m for m in collection.get()['metadatas']]}")
+        
+        # Query the collection
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results,
+            include=["documents", "metadatas", "distances"]
+        )
+        
+        print("\nDebug - Raw query results:")
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+        
+        return {
+            "results": {
+                "documents": [doc for doc in results["documents"][0]],
+                "metadata": results["metadatas"][0],
+                "distances": results["distances"][0]
+            },
+            "query": query_text
+        }
+        
+    except Exception as e:
+        print(f"Error querying database: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
+
 def analyze_with_reflection(query_text: str, context: str = ""):
     """Analyze documents with self-reflection capabilities"""
     
-    # Initialize agent with enhanced prompt for self-reflection
-    agent = Agent(
-        model=model,
-        result_type=AnalysisResponse,
-        deps_type=QueryInput,
-        retries=3,
-        system_prompt=(
-            "You are an expert document analyzer with advanced self-reflection capabilities.\n"
-            "Follow these steps for each analysis:\n\n"
-            "1. REFLECT - Before searching:\n"
-            "   - Understand the query deeply\n"
-            "   - Consider what information you need\n"
-            "   - Plan your search strategy\n\n"
-            "2. SEARCH - Use the query_vector_db tool to find relevant information\n\n"
-            "3. ANALYZE - Process the search results:\n"
-            "   - Look for direct evidence\n"
-            "   - Consider context and implications\n"
-            "   - Note any limitations or gaps\n\n"
-            "4. REFLECT AGAIN - After analysis:\n"
-            "   - Assess confidence in findings\n"
-            "   - Consider alternative interpretations\n"
-            "   - Identify follow-up questions\n\n"
-            "5. RESPOND - Provide structured output:\n"
-            "   - Include your reflection process\n"
-            "   - Support findings with evidence\n"
-            "   - Note confidence levels and limitations\n"
-            "   - Suggest next steps or recommendations\n\n"
-            "If you encounter unclear or ambiguous queries, raise a ModelRetry with specific clarification needs."
-        ),
-        tools=[Tool(query_vector_db, takes_ctx=True)],
-    )
-
-    @agent.tool_plain()
-    def refine_search(initial_results: str, focus_area: str) -> str:
-        """Refine the search based on initial results and a specific focus area."""
-        try:
-            # Parse initial results
-            results = json.loads(initial_results)
-            if not results.get("results", {}).get("documents"):
-                raise ModelRetry(
-                    "No relevant documents found. Consider:\n"
-                    "1. Broadening the search terms\n"
-                    "2. Checking if documents are properly loaded\n"
-                    "3. Using alternative keywords"
-                )
-            
-            # Perform refined search
-            refined_query = f"{query_text} {focus_area}"
-            refined_results = query_vector_db(refined_query)
-            return refined_results
-            
-        except json.JSONDecodeError:
-            raise ModelRetry("Error parsing search results. Please try a different search approach.")
-
-    # First, query the vector database
-    print("\nInitial Search Results:")
-    results = query_vector_db(query_text)
-    print(json.dumps(json.loads(results), indent=2))
-
     # Run analysis with reflection
     query = QueryInput(query=query_text, context=context)
     response = agent.run_sync(
@@ -219,20 +244,196 @@ def clear_screen():
 def print_menu():
     """Print the main menu"""
     clear_screen()
-    print("\n=== Termite Inspection Knowledge Base ===")
+    print("\n===  FC RAG Knowledge Base ===")
     print("\n1. Add File to Knowledge Base")
     print("2. List and Remove Files")
     print("3. Ask Questions About Knowledge Base")
-    print("4. Exit")
-    print("\nSelect an option (1-4): ")
+    print("4. View Database Contents")
+    print("5. Exit")
+    print("\nSelect an option (1-5): ")
+
+def handle_view_contents():
+    """Handle viewing the contents of the vector database"""
+    while True:
+        clear_screen()
+        print("\n=== Vector Database Contents ===")
+        
+        contents = get_db_contents()
+        if not contents:
+            print("\nNo contents found in database or error occurred")
+            input("\nPress Enter to return to main menu...")
+            return
+        
+        print(f"\nTotal Documents: {contents['total_documents']}")
+        
+        if contents['documents']:
+            print("\nOptions:")
+            print("1. View document list")
+            print("2. View document details")
+            print("3. Return to main menu")
+            
+            choice = input("\nSelect an option (1-3): ")
+            
+            if choice == "1":
+                print("\nDocument List:")
+                for i, doc in enumerate(contents['documents'], 1):
+                    file_name = doc['metadata'].get('file_name', 'Unknown')
+                    print(f"{i}. {file_name}")
+                input("\nPress Enter to continue...")
+                
+            elif choice == "2":
+                print("\nEnter the number of the document to view details (1-{len(contents['documents'])})")
+                try:
+                    doc_num = int(input()) - 1
+                    if 0 <= doc_num < len(contents['documents']):
+                        doc = contents['documents'][doc_num]
+                        print("\nDocument Details:")
+                        print(f"ID: {doc['id']}")
+                        print(f"File Name: {doc['metadata'].get('file_name', 'Unknown')}")
+                        print(f"Hash: {doc['metadata'].get('file_hash', 'Unknown')}")
+                        print("\nContent Preview (first 200 characters):")
+                        print(doc['text'][:200] + "..." if len(doc['text']) > 200 else doc['text'])
+                    else:
+                        print("\nInvalid document number")
+                except ValueError:
+                    print("\nInvalid input")
+                input("\nPress Enter to continue...")
+                
+            elif choice == "3":
+                return
+            else:
+                print("\nInvalid option")
+                input("\nPress Enter to continue...")
+        else:
+            print("\nNo documents found in the database")
+            input("\nPress Enter to return to main menu...")
+            return
+
+def validate_file(file_path: str) -> tuple[bool, str]:
+    """
+    Validate if the file exists and has an allowed extension
+    Returns: (is_valid: bool, error_message: str)
+    """
+    ALLOWED_EXTENSIONS = {'.txt', '.pdf'}
+    if not os.path.exists(file_path):
+        return False, f"File not found: {file_path}"
+    
+    file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        return False, f"Unsupported file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+    
+    return True, ""
+
+def display_chunks(chunks):
+    """Display the content chunks in a readable format"""
+    if not chunks:
+        print("\nNo chunks found")
+        return
+        
+    print(f"\nTotal chunks: {len(chunks)}")
+    print("\nContent Chunks:")
+    
+    def decode_text(text):
+        """Helper function to decode text that might be Unicode escaped"""
+        if isinstance(text, str):
+            try:
+                # First try to decode as UTF-8
+                return text.encode('utf-8').decode('utf-8')
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                try:
+                    # If that fails, try to decode Unicode escapes
+                    return text.encode().decode('unicode-escape')
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    return text
+        return str(text)
+    
+    # Handle both list and dict formats
+    if isinstance(chunks, list):
+        for i, chunk in enumerate(chunks, 1):
+            print(f"\n=== Chunk {i} ===\n")
+            if isinstance(chunk, str):
+                print(decode_text(chunk))
+            elif isinstance(chunk, dict) and 'text' in chunk:
+                print(decode_text(chunk['text']))
+            else:
+                print(chunk)
+    else:
+        for i, chunk in enumerate(chunks['documents'], 1):
+            print(f"\n=== Chunk {i} ===\n")
+            if isinstance(chunk, str):
+                print(decode_text(chunk))
+            elif isinstance(chunk, dict) and 'text' in chunk:
+                print(decode_text(chunk['text']))
+            else:
+                print(chunk)
+            
+    input("\nPress Enter to continue...")
+
+def display_results(results: Dict):
+    """Display search results in a readable format"""
+    if not results:
+        print("\nNo results found")
+        return
+        
+    print("\nSearch Results:\n")
+    
+    for i, (doc, meta, dist) in enumerate(zip(
+        results["results"]["documents"],
+        results["results"]["metadata"],
+        results["results"]["distances"]
+    ), 1):
+        print(f"\n=== Result {i} (Relevance: {(1-dist)*100:.1f}%) ===\n")
+        print(f"From chunk {meta['chunk_index']+1} of {meta['total_chunks']}")
+        print("-" * 80)
+        print(doc)
+        print("-" * 80)
+    
+    print("\nEnd of results")
+    input("\nPress Enter to continue...")
 
 def handle_add_file():
     """Handle adding a file to the knowledge base"""
-    clear_screen()
-    print("\n=== Add File to Knowledge Base ===")
-    file_path = input("\nEnter the path to the file: ")
-    add_document(file_path)
-    input("\nPress Enter to continue...")
+    while True:
+        clear_screen()
+        print("\n=== Add File to Knowledge Base ===")
+        print(f"\nSupported file types: {', '.join({'.txt', '.pdf'})}")
+        
+        file_path = input("\nEnter the path to the file (or 'back' to return): ")
+        
+        if file_path.lower() == 'back':
+            return
+        
+        # Validate file
+        is_valid, error_message = validate_file(file_path)
+        if not is_valid:
+            print(f"\nError: {error_message}")
+            input("\nPress Enter to try again...")
+            continue
+        
+        # Try to process the file
+        try:
+            print(f"\nProcessing {file_path}...")
+            chunks = process_file(file_path)
+            
+            if chunks:
+                print(f"\nSuccessfully added {file_path} to the knowledge base")
+                
+                # Show the embedded chunks
+                print("\n=== Embedded Content Chunks ===")
+                display_chunks(chunks)
+                
+                # Show current files in database
+                print("\nCurrent files in knowledge base:")
+                files = list_files_in_db()
+                for i, file in enumerate(files, 1):
+                    print(f"{i}. {file}")
+            else:
+                print(f"\nFailed to add {file_path} to the knowledge base")
+        except Exception as e:
+            print(f"\nError processing file: {str(e)}")
+        
+        input("\nPress Enter to continue...")
+        break
 
 def handle_list_and_remove():
     """Handle listing and removing files"""
@@ -256,7 +457,15 @@ def handle_list_and_remove():
             try:
                 file_num = int(file_num)
                 if 1 <= file_num <= len(files):
-                    remove_document(files[file_num - 1])
+                    file_to_remove = files[file_num - 1]
+                    confirm = input(f"\nAre you sure you want to remove '{file_to_remove}'? (y/n): ")
+                    if confirm.lower() == 'y':
+                        if remove_document(file_to_remove):
+                            print(f"\nSuccessfully removed {file_to_remove}")
+                        else:
+                            print(f"\nFailed to remove {file_to_remove}")
+                    else:
+                        print("\nOperation cancelled")
                     input("\nPress Enter to continue...")
                 else:
                     print("\nInvalid file number")
@@ -283,6 +492,8 @@ def main():
         elif choice == "3":
             handle_questions()
         elif choice == "4":
+            handle_view_contents()
+        elif choice == "5":
             print("\nGoodbye!")
             break
         else:
