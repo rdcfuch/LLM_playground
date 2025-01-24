@@ -1,7 +1,6 @@
 import hashlib
 import json
 import os
-import uuid
 from dotenv import load_dotenv
 import chromadb
 from chromadb.config import Settings
@@ -23,7 +22,7 @@ CHUNK_SIZE = 1000  # characters
 CHUNK_OVERLAP = 200  # characters
 EMBEDDING_MODEL = "text-embedding-ada-002"
 
-# Initialize OpenAI client
+# Initialize OpenAI client with API key from environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Get absolute path for vector database

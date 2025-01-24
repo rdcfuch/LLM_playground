@@ -22,10 +22,14 @@ from utils.chroma_v_db import (
 # Set environment variable to ignore Logfire warnings
 os.environ["LOGFIRE_IGNORE_NO_CONFIG"] = "1"
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 # Model configuration
-DeepSeek_MODEL = "deepseek-chat"
-DeepSeek_API_KEY = "sk-be34b6c3d96f416b86a097987ac9b1fe"
-DeepSeek_BASE_URL = "https://api.deepseek.com"
+DeepSeek_MODEL = os.getenv("DeepSeek_MODEL")
+DeepSeek_API_KEY = os.getenv("DeepSeek_API_KEY")
+DeepSeek_BASE_URL = os.getenv("DeepSeek_BASE_URL")
 
 model = OpenAIModel(
     model_name=DeepSeek_MODEL,
@@ -173,6 +177,7 @@ async def handle_questions(query: str, context: str = "") -> Dict:
             "limitations": response.limitations
         }
         
+        print(formatted_response)
         return formatted_response
         
     except Exception as e:
