@@ -16,6 +16,11 @@ function App() {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
+    // Scroll to top on initial load
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     fetchFiles();
   }, []);
 
@@ -103,40 +108,6 @@ function App() {
     }
   };
 
-  const handleQuery = async (query) => {
-    try {
-      setIsQuerying(true);
-      // Add the user's message first
-      setMessages(prevMessages => [...prevMessages, {
-        type: 'user',
-        content: query
-      }]);
-      // Then add the loading message
-      setMessages(prevMessages => [...prevMessages, {
-        type: 'assistant',
-        content: '',
-        loading: true
-      }]);
-
-      const response = await axios.post('/query', {
-        query: query
-      });
-
-      handleQueryResponse(response);
-    } catch (error) {
-      // Replace loading message with error message
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        newMessages[newMessages.length - 1] = {
-          type: 'assistant',
-          content: 'Sorry, I encountered an error while processing your request.',
-          error: true
-        };
-        return newMessages;
-      });
-      console.error('Error querying:', error);
-    }
-  };
 
   const handleQueryResponse = async (response) => {
     try {
@@ -147,7 +118,7 @@ function App() {
           if (typeof value === 'string') {
             try {
               // Try to decode any encoded Unicode characters
-              return decodeURIComponent(JSON.parse('"' + value.replace(/\"/g, '\\"') + '"'));
+              return decodeURIComponent(JSON.parse('"' + value.replace(/"/g, '\\"') + '"'));
             } catch (e) {
               return value;
             }
