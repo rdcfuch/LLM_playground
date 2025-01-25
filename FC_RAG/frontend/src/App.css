@@ -475,6 +475,69 @@ button.uploading {
   background-color: #525252;
 }
 
+.loading-animation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+}
+
+.loading-animation span {
+  color: #666;
+  font-style: italic;
+}
+
+.dot-pulse {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: #3498db;
+  color: #3498db;
+  animation: dot-pulse 1s infinite linear;
+  animation-delay: 0.25s;
+}
+
+.dot-pulse::before,
+.dot-pulse::after {
+  content: '';
+  display: inline-block;
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: #3498db;
+  color: #3498db;
+}
+
+.dot-pulse::before {
+  left: -15px;
+  animation: dot-pulse 1s infinite linear;
+  animation-delay: 0s;
+}
+
+.dot-pulse::after {
+  left: 15px;
+  animation: dot-pulse 1s infinite linear;
+  animation-delay: 0.5s;
+}
+
+@keyframes dot-pulse {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.2);
+    opacity: 0.8;
+  }
+}
+
 @media (max-width: 600px) {
   .App {
     padding: 10px;

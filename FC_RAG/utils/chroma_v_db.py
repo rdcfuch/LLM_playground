@@ -12,6 +12,9 @@ from PIL import Image
 import PyPDF2
 from io import BytesIO
 from typing import List, Dict
+import uuid
+import unicodedata
+import re
 
 # Load environment variables
 load_dotenv()
@@ -92,22 +95,23 @@ def extract_text_from_file(file_path):
     if file_ext == '.pdf':
         return extract_text_from_pdf(file_path)
     elif file_ext == '.txt':
-        encodings = ['utf-8', 'gb18030', 'gbk', 'gb2312', 'big5']
+        # Try UTF-8 first, then Chinese encodings
+        encodings = ['utf-8', 'utf-8-sig', 'gb18030', 'gbk', 'gb2312', 'big5']
         for encoding in encodings:
             try:
                 with open(file_path, 'r', encoding=encoding) as file:
                     text = file.read()
-                    # Verify the text is readable Chinese
-                    if any('\u4e00' <= char <= '\u9fff' for char in text):
-                        print(f"\nDebug - Successfully read with {encoding} encoding")
-                        print(f"Debug - Extracted text length: {len(text)} characters")
-                        print(f"Debug - First 100 chars: {text[:100]}")
-                        return text
+                    # Normalize Unicode characters to ensure consistent representation
+                    text = unicodedata.normalize('NFKC', text)
+                    print(f"\nDebug - Successfully read with {encoding} encoding")
+                    print(f"Debug - Extracted text length: {len(text)} characters")
+                    print(f"Debug - First 100 chars: {text[:100]}")
+                    return text
             except UnicodeDecodeError:
                 continue
-        raise ValueError(f"Could not decode file with any known Chinese encoding")
+        raise ValueError(f"Could not decode file with any known encoding")
     else:
-        raise ValueError(f"Unsupported file type: {file_ext}")
+        raise ValueError(f"Unsupported file extension: {file_ext}")
 
 
 # Split text into chunks
@@ -123,54 +127,43 @@ def split_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     """
     if not text:
         return []
-        
-    # Clean the text
-    text = text.strip().replace('\n\n', '。').replace('\n', '。')
-    print(f"\nDebug - Text length after cleaning: {len(text)} characters")
-    
-    # If text is shorter than chunk_size, return it as a single chunk
-    if len(text) <= chunk_size:
-        return [text]
-    
-    chunks = []
-    start = 0
-    text_len = len(text)
-    
-    while start < text_len:
-        # Get a chunk of size chunk_size or until the end of text
-        end = min(start + chunk_size, text_len)
-        
-        # If we're not at the end of the text, try to find a good break point
-        if end < text_len:
-            # Look for the last occurrence of a sentence-ending punctuation
-            for punct in ['。', '！', '？', '. ', '! ', '? ']:
-                last_punct = text[start:end].rfind(punct)
-                if last_punct != -1:
-                    end = start + last_punct + len(punct)
-                    break
-        
-        # Add the chunk
-        chunk = text[start:end].strip()
-        if chunk:  # Only add non-empty chunks
-            chunks.append(chunk)
-            print(f"\nDebug - Added chunk {len(chunks)}, length: {len(chunk)} characters")
-            print(f"Debug - Chunk start: {chunk[:50]}...")
-            print(f"Debug - Chunk end: ...{chunk[-50:]}")
-        
-        # Move the start pointer, accounting for overlap
-        start = end - overlap if end < text_len else text_len
-    
-    # Post-process: ensure no duplicate chunks and no empty chunks
-    chunks = [chunk for chunk in chunks if chunk.strip()]
-    print(f"\nDebug - Final number of chunks: {len(chunks)}")
-    
-    # Verify we haven't lost any text
-    total_chars = sum(len(chunk) for chunk in chunks)
-    print(f"Debug - Total characters in chunks: {total_chars}")
-    print(f"Debug - Original text length: {len(text)}")
-    
-    return chunks
 
+    # Normalize text to ensure consistent handling of Chinese characters
+    text = unicodedata.normalize('NFKC', text)
+    
+    # Split text into sentences, preserving Chinese punctuation
+    sentence_endings = r'[.!?。！？\n]'
+    sentences = []
+    current = ""
+    
+    for char in text:
+        current += char
+        if re.search(sentence_endings, char):
+            sentences.append(current.strip())
+            current = ""
+    if current:
+        sentences.append(current.strip())
+
+    chunks = []
+    current_chunk = []
+    current_size = 0
+    
+    for sentence in sentences:
+        sentence_size = len(sentence)
+        
+        if current_size + sentence_size <= chunk_size:
+            current_chunk.append(sentence)
+            current_size += sentence_size
+        else:
+            if current_chunk:
+                chunks.append(" ".join(current_chunk))
+            current_chunk = [sentence]
+            current_size = sentence_size
+            
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+        
+    return chunks
 
 # Generate a unique hash for the file content
 def compute_file_hash(file_path):
@@ -249,8 +242,8 @@ def store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash, vector
         # Ensure text chunks are properly encoded
         encoded_chunks = []
         for chunk in text_chunks:
-            # Normalize the text to ensure consistent encoding
-            normalized = chunk.encode('utf-8').decode('utf-8')
+            # Normalize Unicode characters for consistent representation
+            normalized = unicodedata.normalize('NFKC', chunk)
             encoded_chunks.append(normalized)
         
         # Store the chunks and their embeddings
@@ -284,61 +277,48 @@ def query_vector_db(query_text=None, ctx=None, vector_store=None):
         str: JSON string with search results
     """
     try:
-        # Extract query from context if available
-        if isinstance(query_text, dict) and 'query' in query_text:
-            query_text = query_text['query']
-        elif isinstance(query_text, str):
-            query_text = query_text
-        else:
-            query_text = "termite inspection report"
-            
-        print(f"\nDebug - Query text: {query_text}")
-            
-        if not query_text:
-            return json.dumps({"results": [], "query": ""})
-            
-        # Get embedding for the query
-        query_response = client.embeddings.create(
-            input=query_text,
-            model=EMBEDDING_MODEL,
-        )
-        query_embedding = query_response.data[0].embedding
-        print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
-        
-        # Get collection info
-        collection_items = vector_store.get_collection().get()
-        print(f"\nDebug - Collection info:")
-        print(f"Number of items: {len(collection_items.get('ids', []))}")
-        print(f"Available metadata: {collection_items.get('metadatas', [])}")
+        # Generate embedding for query
+        query_embedding = generate_embeddings([query_text])[0]
         
         # Query the collection
         results = vector_store.get_collection().query(
             query_embeddings=[query_embedding],
-            n_results=5,
-            include=["documents", "metadatas", "distances"]
+            n_results=5
         )
         
-        print(f"\nDebug - Raw query results:")
-        print(json.dumps(results, indent=2))
+        # Format results
+        documents = []
+        for i in range(len(results['ids'][0])):
+            doc = {
+                'id': results['ids'][0][i],
+                'text': results['documents'][0][i],
+                'metadata': results['metadatas'][0][i] if results['metadatas'] else {},
+                'distance': results['distances'][0][i] if 'distances' in results else None
+            }
+            documents.append(doc)
         
-        # Format results as simple types for JSON serialization
-        formatted_results = {
-            "documents": list(map(str, results["documents"][0])) if results["documents"] else [],
-            "metadata": [dict(m) for m in results["metadatas"][0]] if results["metadatas"] else [],
-            "distances": [float(d) for d in results["distances"][0]] if results["distances"] else []
+        # Generate a simple answer based on the found documents
+        answer = "Here are the relevant documents I found:"
+        
+        # Ensure proper encoding of response
+        response = {
+            'success': True,
+            'query': query_text,
+            'answer': answer,
+            'documents': documents
         }
         
-        # Return JSON string
-        return json.dumps({
-            "results": formatted_results,
-            "query": query_text
-        })
+        # Use ensure_ascii=False to properly handle Chinese characters
+        return json.dumps(response, ensure_ascii=False)
         
     except Exception as e:
-        print(f"Error querying vector database: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        return json.dumps({"results": {"documents": [], "metadata": [], "distances": []}, "query": str(query_text)})
+        error_msg = f"Error querying vector database: {str(e)}"
+        print(error_msg)
+        return json.dumps({
+            'success': False,
+            'error': error_msg
+        }, ensure_ascii=False)
+
 
 # Display search results
 def display_results(results: Dict):
