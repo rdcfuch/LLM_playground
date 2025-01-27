@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, UploadFile, HTTPException, Request
+from fastapi import FastAPI, UploadFile, HTTPException, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +7,13 @@ import os
 import json
 from utils.chroma_v_db import validate_file, process_file, list_files_in_db, ChromaVectorStore, remove_file_from_db, query_vector_db
 from pydantic_tool_rag_chroma import handle_questions
+from typing import Dict
+from collections import defaultdict
 
 app = FastAPI(title="Knowledge Base Manager")
+
+# Store WebSocket connections
+active_connections: Dict[str, WebSocket] = {}
 
 # Initialize vector store at module level
 vector_store = ChromaVectorStore()
@@ -41,13 +46,40 @@ async def list_files():
             content={"success": False, "message": str(e)}
         )
 
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await websocket.accept()
+    active_connections[client_id] = websocket
+    try:
+        while True:
+            await websocket.receive_text()
+    except:
+        if client_id in active_connections:
+            del active_connections[client_id]
+
+async def send_progress_update(client_id: str, stage: str, progress: float, message: str = ""):
+    if client_id in active_connections:
+        try:
+            await active_connections[client_id].send_json({
+                "type": "progress",
+                "stage": stage,
+                "progress": progress,
+                "message": message
+            })
+        except:
+            if client_id in active_connections:
+                del active_connections[client_id]
+
 @app.post("/upload")
-async def upload_file(file: UploadFile):
+async def upload_file(file: UploadFile, client_id: str = None):
     try:
         print(f"Received file: {file.filename}")
         
         # Create data directory if it doesn't exist
         os.makedirs("data", exist_ok=True)
+        
+        if client_id:
+            await send_progress_update(client_id, "saving", 0, "Saving file...")
         
         # Save the file
         file_path = os.path.join("data", file.filename)
@@ -55,25 +87,41 @@ async def upload_file(file: UploadFile):
             content = await file.read()
             f.write(content)
         
+        if client_id:
+            await send_progress_update(client_id, "validating", 20, "Validating file...")
+        
         # Validate file
         is_valid, error_message = validate_file(file_path)
         if not is_valid:
             os.remove(file_path)  # Clean up invalid file
+            if client_id:
+                await send_progress_update(client_id, "error", 0, error_message)
             return JSONResponse(
                 status_code=400,
                 content={"success": False, "message": error_message}
             )
         
+        if client_id:
+            await send_progress_update(client_id, "processing", 40, "Processing file...")
+        
         # Process file and store in vector database
-        success, chunks = process_file(file_path, vector_store)
+        progress_callback = None
+        if client_id:
+            progress_callback = lambda stage, prog, msg: send_progress_update(client_id, stage, 40 + prog * 0.6, msg)
+        
+        success, chunks = process_file(file_path, vector_store, progress_callback=progress_callback)
         
         if success:
+            if client_id:
+                await send_progress_update(client_id, "complete", 100, "File processed successfully!")
             return JSONResponse(content={
                 "success": True,
                 "message": f"File {file.filename} uploaded and processed successfully",
                 "chunks": chunks
             })
         else:
+            if client_id:
+                await send_progress_update(client_id, "error", 0, f"Error processing file {file.filename}")
             return JSONResponse(
                 status_code=500,
                 content={
@@ -84,6 +132,8 @@ async def upload_file(file: UploadFile):
             
     except Exception as e:
         print(f"Error uploading file: {str(e)}")
+        if client_id:
+            await send_progress_update(client_id, "error", 0, f"Error uploading file: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"Error uploading file: {str(e)}"}

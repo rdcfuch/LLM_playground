@@ -16,9 +16,13 @@ from pydantic_ai.models.openai import OpenAIModel
 
 nest_asyncio.apply()
 
-DeepSeek_MODEL = "deepseek-chat"
-DeepSeek_API_KEY = "sk-be34b6c3d96f416b86a097987ac9b1fe"
-DeepSeek_BASE_URL = "https://api.deepseek.com"
+# 加载.env文件中的环境变量
+load_dotenv()
+
+# 从.env文件中读取DeepSeek模型的相关信息
+DeepSeek_MODEL = os.getenv('DeepSeek_MODEL')
+DeepSeek_API_KEY = os.getenv('DeepSeek_API_KEY')
+DeepSeek_BASE_URL = os.getenv('DeepSeek_BASE_URL')
 
 model = OpenAIModel(
         model_name=DeepSeek_MODEL,

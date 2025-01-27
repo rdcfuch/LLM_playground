@@ -1,0 +1,6 @@
+# requirements.txt
+python-dotenv
+requests
+aiohttp
+beautifulsoup4
+lxml

@@ -6,10 +6,10 @@ import os
 import json
 import asyncio
 from utils.chroma_v_db import (
-    query_vector_db as chroma_query_db, 
-    process_file, 
-    remove_file_from_db, 
-    list_files_in_db, 
+    query_vector_db as chroma_query_db,
+    process_file,
+    remove_file_from_db,
+    list_files_in_db,
     get_db_contents,
     ChromaVectorStore,
     client as openai_client,
@@ -95,10 +95,10 @@ agent = Agent(
 
 @agent.tool()
 async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dict:
-    """Query the vector database with the given text query"""
+    """When you think the user's question is related to a specific knowledge, you will use this tool to Query the vector database with the given text query"""
     try:
         print(f"\nDebug - Query text: {query_text}")
-        
+
         # Generate embedding for the query
         query_response = openai_client.embeddings.create(
             input=query_text,
@@ -106,24 +106,24 @@ async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) 
         )
         query_embedding = query_response.data[0].embedding
         print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
-        
+
         # Get collection info
         print("\nDebug - Collection info:")
         vector_store = ChromaVectorStore()
         collection = vector_store.get_collection()
         print(f"Number of items: {collection.count()}")
         print(f"Available metadata: {[m for m in collection.get()['metadatas']]}")
-        
+
         # Query the collection
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
             include=["documents", "metadatas", "distances"]
         )
-        
+
         print("\nDebug - Raw query results:")
         print(json.dumps(results, indent=2, ensure_ascii=False))
-        
+
         return {
             "results": {
                 "documents": [doc for doc in results["documents"][0]],
@@ -132,7 +132,7 @@ async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) 
             },
             "query": query_text
         }
-        
+
     except Exception as e:
         print(f"Error querying database: {e}")
         import traceback
@@ -141,7 +141,7 @@ async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) 
 
 async def analyze_with_reflection(query_text: str, context: str = ""):
     """Analyze documents with self-reflection capabilities"""
-    
+
     # Run analysis with reflection
     query = QueryInput(query=query_text, context=context)
     try:
@@ -160,7 +160,7 @@ async def handle_questions(query: str, context: str = "") -> Dict:
     """Handle asking questions about the knowledge base with reflection"""
     try:
         response = await analyze_with_reflection(query, context)
-        
+
         # Format response as a dictionary
         formatted_response = {
             "reflection": {
@@ -176,10 +176,10 @@ async def handle_questions(query: str, context: str = "") -> Dict:
             "recommendations": response.recommendations,
             "limitations": response.limitations
         }
-        
+
         print(formatted_response)
         return formatted_response
-        
+
     except Exception as e:
         print(f"\nError during analysis: {e}")
         import traceback
@@ -194,7 +194,7 @@ async def add_document(file_path: str):
     if not os.path.exists(file_path):
         print(f"Error: File {file_path} does not exist")
         return False
-        
+
     print(f"\nProcessing {file_path}...")
     if process_file(file_path):
         print(f"\nSuccessfully added {file_path} to the vector database")
@@ -243,32 +243,32 @@ async def handle_add_file():
     while True:
         await print_menu()
         choice = input("\nSelect an option (1-4): ")
-        
+
         if choice == "1":
             # Get file path
             file_path = input("\nEnter the path to the file: ")
-            
+
             try:
                 # Process file and get chunks
                 chunks = process_file(file_path)
-                
+
                 if chunks:
                     print(f"\nSuccessfully added {file_path} to the knowledge base")
-                    
+
                     # Show current files in database
                     print("\nCurrent files in knowledge base:")
                     files = list_files_in_db()
                     for i, file in enumerate(files, 1):
                         print(f"{i}. {file}")
-                    
+
                 else:
                     print(f"\nFailed to add {file_path} to the knowledge base")
-                
+
             except Exception as e:
                 print(f"\nError processing file: {e}")
-            
+
             input("\nPress Enter to continue...")
-            
+
         elif choice == "2":
             return
         else:
@@ -281,17 +281,17 @@ async def handle_list_and_remove():
         clear_screen()
         print("\n=== List and Remove Files ===")
         files = list_files_in_db()
-        
+
         if not files:
             input("\nPress Enter to return to main menu...")
             return
-            
+
         print("\nOptions:")
         print("1. Remove a file")
         print("2. Return to main menu")
-        
+
         choice = input("\nSelect an option (1-2): ")
-        
+
         if choice == "1":
             file_num = input("\nEnter the number of the file to remove: ")
             try:
@@ -324,7 +324,7 @@ async def main():
     while True:
         await print_menu()
         choice = input().strip()
-        
+
         if choice == "1":
             await handle_add_file()
         elif choice == "2":
