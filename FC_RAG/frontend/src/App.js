@@ -13,7 +13,45 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isQuerying, setIsQuerying] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const wsRef = useRef(null);
+  const clientIdRef = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    // Connect to WebSocket
+    connectWebSocket();
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  const connectWebSocket = () => {
+    const ws = new WebSocket(`ws://${window.location.host}/ws/${clientIdRef.current}`);
+    
+    ws.onopen = () => {
+      console.log('WebSocket Connected');
+    };
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'progress') {
+        setUploadProgress(data.progress);
+        setProgressMessage(data.message);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket Disconnected');
+      // Attempt to reconnect after 2 seconds
+      setTimeout(connectWebSocket, 2000);
+    };
+    
+    wsRef.current = ws;
+  };
 
   useEffect(() => {
     // Scroll to top on initial load
@@ -60,9 +98,11 @@ function App() {
     formData.append('file', selectedFile);
     setIsUploading(true);
     setUploadStatus('Uploading...');
+    setUploadProgress(0);
+    setProgressMessage('Starting upload...');
 
     try {
-      const response = await axios.post('/upload', formData, {
+      const response = await axios.post(`/upload?client_id=${clientIdRef.current}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -83,7 +123,8 @@ function App() {
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      setUploadStatus('Error uploading file: ' + error.message);
+      setUploadStatus('Error uploading file: ' + (error.response?.data?.message || error.message));
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -107,7 +148,6 @@ function App() {
       setTimeout(() => setDeleteStatus(''), 3000);
     }
   };
-
 
   const handleQueryResponse = async (response) => {
     try {
@@ -550,6 +590,36 @@ function App() {
             max-height: 100px;
             overflow-y: auto;
           }
+
+          .progress-bar-container {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background: #f7fafc;
+          }
+
+          .progress-bar {
+            height: 10px;
+            border-radius: 4px;
+            background: #2b6cb0;
+            position: relative;
+          }
+
+          .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 0.8em;
+          }
+
+          .progress-message {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #4a5568;
+          }
         `}
       </style>
       <header className="App-header">
@@ -565,7 +635,7 @@ function App() {
                 type="file"
                 id="fileInput"
                 onChange={handleFileSelect}
-                accept=".txt,.pdf"
+                accept=".txt,.pdf,.md"
                 disabled={isUploading}
               />
               <button
@@ -576,6 +646,14 @@ function App() {
                 {isUploading ? 'Uploading...' : 'Upload'}
               </button>
             </div>
+            {isUploading && (
+              <div className="progress-bar-container">
+                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}>
+                  <span className="progress-text">{uploadProgress.toFixed(1)}%</span>
+                </div>
+                <div className="progress-message">{progressMessage}</div>
+              </div>
+            )}
             {uploadStatus && (
               <div className={`status ${uploadStatus.includes('successfully') ? 'success' : 'error'}`}>
                 {uploadStatus}

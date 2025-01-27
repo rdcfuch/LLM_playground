@@ -110,6 +110,22 @@ def extract_text_from_file(file_path):
             except UnicodeDecodeError:
                 continue
         raise ValueError(f"Could not decode file with any known encoding")
+    elif file_ext == '.md':
+        # Try UTF-8 first, then Chinese encodings
+        encodings = ['utf-8', 'utf-8-sig', 'gb18030', 'gbk', 'gb2312', 'big5']
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as file:
+                    text = file.read()
+                    # Normalize Unicode characters to ensure consistent representation
+                    text = unicodedata.normalize('NFKC', text)
+                    print(f"\nDebug - Successfully read with {encoding} encoding")
+                    print(f"Debug - Extracted text length: {len(text)} characters")
+                    print(f"Debug - First 100 chars: {text[:100]}")
+                    return text
+            except UnicodeDecodeError:
+                continue
+        raise ValueError(f"Could not decode file with any known encoding")
     else:
         raise ValueError(f"Unsupported file extension: {file_ext}")
 
@@ -510,7 +526,7 @@ def validate_file(file_path: str):
     """
     try:
         # Check file extension
-        allowed_extensions = {'.txt', '.pdf'}
+        allowed_extensions = {'.txt', '.pdf', '.md'}
         file_extension = os.path.splitext(file_path)[1].lower()
         
         if file_extension not in allowed_extensions:
@@ -523,7 +539,7 @@ def validate_file(file_path: str):
         return False, str(e)
 
 # Main function to process files and store embeddings
-def process_file(file_path, vector_store):
+def process_file(file_path, vector_store, progress_callback=None):
     """Process a file and store its embeddings in the vector database"""
     try:
         print(f"\nProcessing file: {file_path}")
@@ -532,53 +548,65 @@ def process_file(file_path, vector_store):
         is_valid, error_message = validate_file(file_path)
         if not is_valid:
             print(f"Error: {error_message}")
-            return None
+            return False, None
         
         if not os.path.exists(file_path):
             print(f"Error: File does not exist")
-            return None
+            return False, None
         
         # Extract text from file
+        if progress_callback:
+            progress_callback("extracting", 0, "Extracting text from file...")
         text = extract_text_from_file(file_path)
         if not text.strip():
             print("Warning: Extracted text is empty")
-            return None
+            return False, None
             
         print(f"\nDebug - Total extracted text length: {len(text)} characters")
         
         # Split text into chunks
+        if progress_callback:
+            progress_callback("chunking", 0.2, "Splitting text into chunks...")
         text_chunks = split_text(text)
         if not text_chunks:
             print("Warning: No text chunks generated")
-            return None
+            return False, None
             
         print(f"\nDebug - Generated {len(text_chunks)} chunks")
         
         # Generate embeddings
+        if progress_callback:
+            progress_callback("embedding", 0.4, "Generating embeddings...")
         embeddings = generate_embeddings(text_chunks)
         if not embeddings:
             print("Warning: No embeddings generated")
-            return None
+            return False, None
             
         print(f"\nDebug - Generated {len(embeddings)} embeddings")
         
         # Compute file hash
+        if progress_callback:
+            progress_callback("hashing", 0.6, "Computing file hash...")
         file_hash = compute_file_hash(file_path)
         
         # Store in database
+        if progress_callback:
+            progress_callback("storing", 0.8, "Storing in database...")
         file_name = os.path.basename(file_path)
         store_embeddings_in_db(file_name, text_chunks, embeddings, file_hash, vector_store)
         
         # Get and return the stored chunks
+        if progress_callback:
+            progress_callback("retrieving", 0.9, "Retrieving stored chunks...")
         chunks = get_file_chunks(file_name, vector_store)
         print(f"\nDebug - Retrieved {len(chunks)} chunks from database")
-        return chunks
+        return True, chunks
         
     except Exception as e:
         print(f"Error processing file: {str(e)}")
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
-        return None
+        return False, None
 
 def handle_view_contents(vector_store):
     """Handle viewing the contents of the vector database"""
@@ -638,7 +666,7 @@ def handle_view_contents(vector_store):
 # Example usage
 if __name__ == "__main__":
     vector_store = ChromaVectorStore()
-    file_paths = ["example.pdf", "example.txt"]  # Replace with paths to your files
+    file_paths = ["example.pdf", "example.txt", "example.md"]  # Replace with paths to your files
     for file_path in file_paths:
         process_file(file_path, vector_store)
 
