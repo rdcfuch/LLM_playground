@@ -1,15 +1,23 @@
 import os
 import random
+import logging
 from dotenv import load_dotenv
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, List, Dict, Any
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
+
+# Configure logging
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 class DynamicAgent:
     """
     A class to dynamically create and manage models using API keys, model names, and base URLs.
-    Supports GPT-4, Kimi (Moonshot), and DeepSeek models.
+    Supports GPT-4, Kimi (Moonshot), and DeepSeek models. Includes memory for chat history.
     """
+
+    SUPPORTED_MODELS = ["gpt-4o-mini", "kimi", "deepseek"]
+    SUPPORTED_TOOL_TYPES = ["tool_plain", "tool"]
 
     def __init__(self, model_type: str, system_prompt: str):
         """
@@ -31,6 +39,7 @@ class DynamicAgent:
         self.model_url: Optional[str] = None
         self.api_key: Optional[str] = None
         self.agent: Optional[Agent] = None
+        self.chat_history: List[Dict[str, str]] = []  # Store chat history
 
         self.create_model(model_type, system_prompt)
 
@@ -45,6 +54,9 @@ class DynamicAgent:
         Raises:
             ValueError: If the model type is not supported or required environment variables are missing.
         """
+        if model_type.lower() not in self.SUPPORTED_MODELS:
+            raise ValueError(f"Unsupported model type: {model_type}. Supported models are: {self.SUPPORTED_MODELS}")
+
         if model_type.lower() == "gpt-4o-mini":
             if not self.openai_api_key:
                 raise ValueError("OPENAI_API_KEY not found in .env file.")
@@ -53,10 +65,10 @@ class DynamicAgent:
             self.api_key = self.openai_api_key
             self.agent = Agent(
                 model=OpenAIModel(model_name=self.model_name, api_key=self.api_key),
-                deps_type=str,
+                deps_type=Dict[str, Any],  # Change deps type to Dict[str, Any]
                 system_prompt=system_prompt,
             )
-            print(f"Created {self.model_name} model with URL: {self.model_url}")
+            logger.info(f"Created {self.model_name} model with URL: {self.model_url}")
 
         elif model_type.lower() == "kimi":
             if not self.kimi_api_key or not self.kimi_model or not self.kimi_base_url:
@@ -66,10 +78,10 @@ class DynamicAgent:
             self.api_key = self.kimi_api_key
             self.agent = Agent(
                 model=OpenAIModel(model_name=self.model_name, api_key=self.api_key),
-                deps_type=str,
+                deps_type=Dict[str, Any],  # Change deps type to Dict[str, Any]
                 system_prompt=system_prompt,
             )
-            print(f"Created {self.model_name} model with URL: {self.model_url}")
+            # logger.info(f"Created {self.model_name} model with URL: {self.model_url}")
 
         elif model_type.lower() == "deepseek":
             if not self.deepseek_api_key or not self.deepseek_model or not self.deepseek_base_url:
@@ -79,13 +91,10 @@ class DynamicAgent:
             self.api_key = self.deepseek_api_key
             self.agent = Agent(
                 model=OpenAIModel(model_name=self.model_name, api_key=self.api_key),
-                deps_type=str,
+                deps_type=Dict[str, Any],  # Change deps type to Dict[str, Any]
                 system_prompt=system_prompt,
             )
-            print(f"Created {self.model_name} model with URL: {self.model_url}")
-
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}")
+            logger.info(f"Created {self.model_name} model with URL: {self.model_url}")
 
     def add_tool(self, func: Callable, tool_type: str = "tool_plain") -> None:
         """
@@ -94,20 +103,26 @@ class DynamicAgent:
         Args:
             func (Callable): The function to be added as a tool.
             tool_type (str): The type of tool to add. Supported values: "tool_plain", "tool".
+
+        Raises:
+            ValueError: If the tool type is not supported.
         """
+        if tool_type not in self.SUPPORTED_TOOL_TYPES:
+            raise ValueError(f"Unsupported tool type: {tool_type}. Supported tool types are: {self.SUPPORTED_TOOL_TYPES}")
+
         if tool_type == "tool_plain":
             self.agent.tool_plain(func)
         elif tool_type == "tool":
             self.agent.tool(func)
-        else:
-            raise ValueError(f"Unsupported tool type: {tool_type}")
 
-    def interact_with_model(self, user_input: str, deps: str = None) -> str:
+    def interact_with_model(self, user_input: str, deps: Dict[str, Any] = None) -> str:
         """
         Interact with the selected model by sending a request to its API.
+        Maintains chat history for context.
 
         Args:
             user_input (str): The input provided by the user.
+            deps (Dict[str, Any]): Optional dependencies to pass to the model, including chat history.
 
         Returns:
             str: The response from the model.
@@ -118,8 +133,36 @@ class DynamicAgent:
         if not self.agent:
             raise ValueError("No model has been created. Call `create_model` first.")
 
-        result = self.agent.run_sync(user_input)
+        # Add user input to chat history
+        self.chat_history.append({"role": "user", "content": user_input})
+
+        # Prepare deps with chat history
+        if deps is None:
+            deps = {}
+        deps["chat_history"] = self.chat_history
+
+        # Pass deps (including chat history) to the agent
+        result = self.agent.run_sync(user_input, deps=deps)
+
+        # Add model response to chat history
+        self.chat_history.append({"role": "assistant", "content": result.data})
+
         return result.data
+
+    def get_chat_history(self) -> List[Dict[str, str]]:
+        """
+        Get the chat history for the current instance.
+
+        Returns:
+            List[Dict[str, str]]: The chat history, where each entry is a dictionary with "role" and "content".
+        """
+        return self.chat_history
+
+    def clear_chat_history(self) -> None:
+        """
+        Clear the chat history for the current instance.
+        """
+        self.chat_history = []
 
     def get_api_key(self) -> Optional[str]:
         """
@@ -165,18 +208,18 @@ if __name__ == "__main__":
         """Roll a six-sided die and return the result."""
         return str(random.randint(1, 6))
 
-    def get_player_name(ctx: RunContext[str]) -> str:
+    def get_player_name(ctx: RunContext[Dict[str, Any]]) -> str:
         """Get the player's name."""
-        return ctx.deps
+        return ctx.deps.get("player_name", "Unknown Player")
 
     def get_current_time() -> str:
         """Get the current time."""
         from datetime import datetime
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    def get_user_guess(ctx: RunContext[str]) -> str:
+    def get_user_guess(ctx: RunContext[Dict[str, Any]]) -> str:
         """Get the user's guess."""
-        return ctx.deps
+        return ctx.deps.get("user_guess", "No guess provided")
 
     # Add tools to the agent
     model_manager.add_tool(roll_die, "tool_plain")
@@ -186,10 +229,26 @@ if __name__ == "__main__":
 
     # Interact with the model
 
+    # Prepare deps with additional context
+
     try:
         while True:
-            user_input=input("let's play game, guess the number I have:")
-            response = model_manager.interact_with_model(user_input, deps='FC')
-            print(response)  # Example output: "I'm just a computer program, so I don't have feelings, but thanks for asking!"
+            user_input = input("Let's play a game! Guess a number between 1 and 6 (or type 'exit' to quit): ")
+            if user_input.lower() == 'exit':
+                break
+
+            deps = {
+                "player_name": "FC",
+                "user_guess": user_input,
+            }
+            
+            response = model_manager.interact_with_model(user_input, deps=deps)
+            print(response)
+
+            # Optionally print chat history
+            print("\nChat History:")
+            for message in model_manager.get_chat_history():
+                print(f"{message['role'].capitalize()}: {message['content']}")
+            print("\n")
     except ValueError as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
