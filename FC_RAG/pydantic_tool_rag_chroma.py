@@ -24,7 +24,12 @@ os.environ["LOGFIRE_IGNORE_NO_CONFIG"] = "1"
 
 # Load environment variables
 from dotenv import load_dotenv
-load_dotenv()
+import os
+
+# Get the project root directory (two levels up from this script)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Load .env from the project root directory
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 # Model configuration
 DeepSeek_MODEL = os.getenv("DeepSeek_MODEL")

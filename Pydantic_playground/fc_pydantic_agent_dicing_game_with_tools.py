@@ -27,7 +27,10 @@ class DynamicAgent:
             model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
             system_prompt (str): The system prompt to use for the agent.
         """
-        load_dotenv()  # Load environment variables from .env file
+        # Get the project root directory (one level up from this script)
+        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Load .env from the project root directory
+        load_dotenv(os.path.join(PROJECT_ROOT, '.env'))  # Load environment variables from .env file
         self.openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
         self.kimi_api_key: Optional[str] = os.getenv("KIMI_API_KEY")
         self.kimi_model: Optional[str] = os.getenv("KIMI_MODEL")
