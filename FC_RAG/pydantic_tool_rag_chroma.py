@@ -1,352 +1,273 @@
-from typing import Dict, List, Optional
-from pydantic import BaseModel, Field
-from pydantic_ai import Agent, ModelRetry, RunContext, Tool
-from pydantic_ai.models.openai import OpenAIModel
 import os
-import json
-import asyncio
-from utils.chroma_v_db import (
-    query_vector_db as chroma_query_db,
-    process_file,
-    remove_file_from_db,
-    list_files_in_db,
-    get_db_contents,
-    ChromaVectorStore,
-    client as openai_client,
-    EMBEDDING_MODEL,
-    display_results,
-    display_chunks,
-    validate_file
-)
-
-# Set environment variable to ignore Logfire warnings
-os.environ["LOGFIRE_IGNORE_NO_CONFIG"] = "1"
-
-# Load environment variables
+import random
+import logging
 from dotenv import load_dotenv
-import os
+from typing import Optional, Callable, List, Dict, Any
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.openai import OpenAIModel
 
-# Get the project root directory (two levels up from this script)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Load .env from the project root directory
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+# Configure logging
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
-# Model configuration
-DeepSeek_MODEL = os.getenv("DeepSeek_MODEL")
-DeepSeek_API_KEY = os.getenv("DeepSeek_API_KEY")
-DeepSeek_BASE_URL = os.getenv("DeepSeek_BASE_URL")
 
-model = OpenAIModel(
-    model_name=DeepSeek_MODEL,
-    api_key=DeepSeek_API_KEY,
-    base_url=DeepSeek_BASE_URL,
-)
+class DynamicModel:
+    """
+    A class to dynamically create and manage models using API keys, model names, and base URLs.
+    Supports GPT-4, Kimi (Moonshot), and DeepSeek models.
+    """
 
-class QueryInput(BaseModel):
-    query: str = Field(description="The search query to look for information in documents")
-    context: Optional[str] = Field(default="", description="Additional context for the query")
+    SUPPORTED_MODELS = ["gpt-4o-mini", "kimi", "deepseek"]
 
-class SearchResult(BaseModel):
-    results: Dict = Field(description="Search results from the vector database")
-    query: str = Field(description="The query that was searched for")
+    def __init__(self, model_type: str):
+        """
+        Initialize the DynamicModel class. Load environment variables from .env file and create the specified model.
 
-class ReflectionThoughts(BaseModel):
-    """Model for agent's self-reflection thoughts"""
-    understanding: str = Field(description="Agent's understanding of the query")
-    search_strategy: str = Field(description="Strategy for searching the documents")
-    confidence: float = Field(description="Confidence in understanding (0-1)")
-    needs_clarification: bool = Field(description="Whether clarification is needed")
-    follow_up_questions: List[str] = Field(default_factory=list, description="Potential follow-up questions")
+        Args:
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
+        """
+        # Get the project root directory (one level up from this script)
+        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Load .env from the project root directory
+        load_dotenv(os.path.join(PROJECT_ROOT, '.env'))  # Load environment variables from .env file
+        self.openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+        self.kimi_api_key: Optional[str] = os.getenv("KIMI_API_KEY")
+        self.kimi_model: Optional[str] = os.getenv("KIMI_MODEL")
+        self.kimi_base_url: Optional[str] = os.getenv("KIMI_BASE_URL")
+        self.deepseek_api_key: Optional[str] = os.getenv("DeepSeek_API_KEY")
+        self.deepseek_model: Optional[str] = os.getenv("DeepSeek_MODEL")
+        self.deepseek_base_url: Optional[str] = os.getenv("DeepSeek_BASE_URL")
+        self.model: Optional[OpenAIModel] = None
 
-class AnalysisResponse(BaseModel):
-    """Enhanced response model with self-reflection"""
-    reflection: ReflectionThoughts = Field(description="Agent's self-reflection on the analysis")
-    findings: Dict[str, List[str]] = Field(description="Key findings from the documents")
-    evidence: List[str] = Field(default_factory=list, description="Evidence supporting the findings")
-    confidence: float = Field(description="Confidence level of the analysis (0-1)")
-    recommendations: List[str] = Field(default_factory=list, description="Recommended actions")
-    limitations: List[str] = Field(default_factory=list, description="Limitations of the analysis")
+        self.create_model(model_type)
 
-# Initialize the agent at the module level
-agent = Agent(
-    model=model,
-    result_type=AnalysisResponse,
-    deps_type=QueryInput,
-    retries=3,
-    system_prompt=(
-        "You are an expert document analyzer with advanced self-reflection capabilities.\n"
-        "Follow these steps for each analysis:\n\n"
-        "1. REFLECT - Before searching:\n"
-        "   - Understand the query deeply\n"
-        "   - Consider what information you need\n"
-        "   - Plan your search strategy\n\n"
-        "2. SEARCH - Use the query_vector_db tool to find relevant information\n\n"
-        "3. ANALYZE - Process the search results:\n"
-        "   - Look for direct evidence\n"
-        "   - Consider context and implications\n"
-        "   - Note any limitations or gaps\n\n"
-        "4. REFLECT AGAIN - After analysis:\n"
-        "   - Assess confidence in findings\n"
-        "   - Consider alternative interpretations\n"
-        "   - Identify follow-up questions\n\n"
-        "5. RESPOND - Provide structured output:\n"
-        "   - Include your reflection process\n"
-        "   - Support findings with evidence\n"
-        "   - Note confidence levels and limitations\n"
-        "   - Suggest next steps or recommendations\n\n"
-        "If you encounter unclear or ambiguous queries, raise a ModelRetry with specific clarification needs."
-    )
-)
+    def create_model(self, model_type: str) -> None:
+        """
+        Dynamically create a model based on the specified model type.
 
-@agent.tool()
-async def query_vector_db(ctx: RunContext, query_text: str, n_results: int = 5) -> Dict:
-    """When you think the user's question is related to a specific knowledge, you will use this tool to Query the vector database with the given text query"""
-    try:
-        print(f"\nDebug - Query text: {query_text}")
+        Args:
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
 
-        # Generate embedding for the query
-        query_response = openai_client.embeddings.create(
-            input=query_text,
-            model=EMBEDDING_MODEL,
+        Raises:
+            ValueError: If the model type is not supported or required environment variables are missing.
+        """
+        if model_type.lower() not in self.SUPPORTED_MODELS:
+            raise ValueError(f"Unsupported model type: {model_type}. Supported models are: {self.SUPPORTED_MODELS}")
+
+        if model_type.lower() == "gpt-4o-mini":
+            if not self.openai_api_key:
+                raise ValueError("OPENAI_API_KEY not found in .env file.")
+            self.model = OpenAIModel(
+                model_name="gpt-4o-mini",
+                api_key=self.openai_api_key,
+                base_url="https://api.openai.com/v1",  # Default OpenAI API URL
+            )
+            logger.info(f"Created GPT-4 model: {self.model}")
+
+        elif model_type.lower() == "kimi":
+            if not self.kimi_api_key or not self.kimi_model or not self.kimi_base_url:
+                raise ValueError("KIMI_API_KEY, KIMI_MODEL, or KIMI_BASE_URL not found in .env file.")
+            self.model = OpenAIModel(
+                model_name=self.kimi_model,
+                api_key=self.kimi_api_key,
+                base_url=self.kimi_base_url,
+            )
+            logger.info(f"Created Kimi model: {self.model}")
+
+        elif model_type.lower() == "deepseek":
+            if not self.deepseek_api_key or not self.deepseek_model or not self.deepseek_base_url:
+                raise ValueError("DeepSeek_API_KEY, DeepSeek_MODEL, or DeepSeek_BASE_URL not found in .env file.")
+            self.model = OpenAIModel(
+                model_name=self.deepseek_model,
+                api_key=self.deepseek_api_key,
+                base_url=self.deepseek_base_url,
+            )
+            logger.info(f"Created DeepSeek model: {self.model}")
+
+    def get_model(self) -> OpenAIModel:
+        """
+        Get the created model instance.
+
+        Returns:
+            OpenAIModel: The created model instance.
+
+        Raises:
+            ValueError: If no model has been created.
+        """
+        if not self.model:
+            raise ValueError("No model has been created. Call `create_model` first.")
+        return self.model
+
+
+class DynamicAgent:
+    """
+    A class to dynamically create and manage agents using the DynamicModel class.
+    Includes memory for chat history.
+    """
+
+    SUPPORTED_TOOL_TYPES = ["tool_plain", "tool"]
+
+    def __init__(self, model_type: str, system_prompt: str):
+        """
+        Initialize the DynamicAgent class. Create a model using DynamicModel and set up the agent.
+
+        Args:
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
+            system_prompt (str): The system prompt to use for the agent.
+        """
+        self.model_manager = DynamicModel(model_type)
+        self.agent: Optional[Agent] = None
+        self.chat_history: List[Dict[str, str]] = []  # Store chat history
+
+        self.create_agent(system_prompt)
+
+    def create_agent(self, system_prompt: str) -> None:
+        """
+        Create an agent using the model created by DynamicModel.
+
+        Args:
+            system_prompt (str): The system prompt to use for the agent.
+        """
+        model = self.model_manager.get_model()
+        self.agent = Agent(
+            model=model,
+            deps_type=Dict[str, Any],  # Change deps type to Dict[str, Any]
+            system_prompt=system_prompt,
         )
-        query_embedding = query_response.data[0].embedding
-        print(f"Debug - Generated query embedding of size: {len(query_embedding)}")
+        logger.info(f"Created agent with model: {model}")
 
-        # Get collection info
-        print("\nDebug - Collection info:")
-        vector_store = ChromaVectorStore()
-        collection = vector_store.get_collection()
-        print(f"Number of items: {collection.count()}")
-        print(f"Available metadata: {[m for m in collection.get()['metadatas']]}")
+    def add_tool(self, func: Callable, tool_type: str = "tool_plain") -> None:
+        """
+        Add a tool to the agent.
 
-        # Query the collection
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results,
-            include=["documents", "metadatas", "distances"]
-        )
+        Args:
+            func (Callable): The function to be added as a tool.
+            tool_type (str): The type of tool to add. Supported values: "tool_plain", "tool".
 
-        print("\nDebug - Raw query results:")
-        print(json.dumps(results, indent=2, ensure_ascii=False))
+        Raises:
+            ValueError: If the tool type is not supported.
+        """
+        if tool_type not in self.SUPPORTED_TOOL_TYPES:
+            raise ValueError(
+                f"Unsupported tool type: {tool_type}. Supported tool types are: {self.SUPPORTED_TOOL_TYPES}")
 
-        return {
-            "results": {
-                "documents": [doc for doc in results["documents"][0]],
-                "metadata": results["metadatas"][0],
-                "distances": results["distances"][0]
-            },
-            "query": query_text
-        }
+        if tool_type == "tool_plain":
+            self.agent.tool_plain(func)
+        elif tool_type == "tool":
+            self.agent.tool(func)
 
-    except Exception as e:
-        print(f"Error querying database: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        return None
+    def interact_with_model(self, user_input: str, deps: Dict[str, Any] = None) -> str:
+        """
+        Interact with the selected model by sending a request to its API.
+        Maintains chat history for context.
 
-async def analyze_with_reflection(query_text: str, context: str = ""):
-    """Analyze documents with self-reflection capabilities"""
+        Args:
+            user_input (str): The input provided by the user.
+            deps (Dict[str, Any]): Optional dependencies to pass to the model, including chat history.
 
-    # Run analysis with reflection
-    query = QueryInput(query=query_text, context=context)
-    try:
-        response = await agent.run(
-            user_prompt=f"Analyze the following query with self-reflection: {query_text}",
-            deps=query
-        )
-        return response.data
-    except Exception as e:
-        print(f"Error in analyze_with_reflection: {str(e)}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        raise
+        Returns:
+            str: The response from the model.
 
-async def handle_questions(query: str, context: str = "") -> Dict:
-    """Handle asking questions about the knowledge base with reflection"""
-    try:
-        response = await analyze_with_reflection(query, context)
+        Raises:
+            ValueError: If no model has been created.
+        """
+        if not self.agent:
+            raise ValueError("No model has been created. Call `create_model` first.")
 
-        # Format response as a dictionary
-        formatted_response = {
-            "reflection": {
-                "understanding": response.reflection.understanding,
-                "confidence": response.reflection.confidence,
-                "needs_clarification": response.reflection.needs_clarification,
-                "follow_up_questions": response.reflection.follow_up_questions,
-                "search_strategy": response.reflection.search_strategy
-            },
-            "findings": response.findings,
-            "evidence": response.evidence,
-            "confidence": response.confidence,
-            "recommendations": response.recommendations,
-            "limitations": response.limitations
-        }
+        # Add user input to chat history
+        self.chat_history.append({"role": "user", "content": user_input})
 
-        print(formatted_response)
-        return formatted_response
+        # Prepare deps with chat history
+        if deps is None:
+            deps = {}
+        deps["chat_history"] = self.chat_history
 
-    except Exception as e:
-        print(f"\nError during analysis: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        return {
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
+        # Pass deps (including chat history) to the agent
+        result = self.agent.run_sync(user_input, deps=deps)
 
-async def add_document(file_path: str):
-    """Add a document to the vector database"""
-    if not os.path.exists(file_path):
-        print(f"Error: File {file_path} does not exist")
-        return False
+        # Add model response to chat history
+        self.chat_history.append({"role": "assistant", "content": result.data})
 
-    print(f"\nProcessing {file_path}...")
-    if process_file(file_path):
-        print(f"\nSuccessfully added {file_path} to the vector database")
-        return True
-    else:
-        print(f"\nFailed to add {file_path} to the vector database")
-        return False
+        return result.data
 
-async def list_documents():
-    """List all documents in the vector database"""
-    files = list_files_in_db()
-    if files:
-        print("\nFiles in vector database:")
-        for i, file in enumerate(files, 1):
-            print(f"{i}. {file}")
-        return files
-    else:
-        print("\nNo files found in vector database")
-        return []
+    def get_chat_history(self) -> List[Dict[str, str]]:
+        """
+        Get the chat history for the current instance.
 
-async def remove_document(file_name: str):
-    """Remove a document from the vector database"""
-    if remove_file_from_db(file_name):
-        print(f"\nSuccessfully removed {file_name} from the vector database")
-        return True
-    else:
-        print(f"\nFailed to remove {file_name} from the vector database")
-        return False
+        Returns:
+            List[Dict[str, str]]: The chat history, where each entry is a dictionary with "role" and "content".
+        """
+        return self.chat_history
 
-def clear_screen():
-    """Clear the terminal screen"""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    def clear_chat_history(self) -> None:
+        """
+        Clear the chat history for the current instance.
+        """
+        self.chat_history = []
 
-async def print_menu():
-    """Print the main menu"""
-    clear_screen()
-    print("\n===  FC RAG Knowledge Base ===")
-    print("\n1. Add File to Knowledge Base")
-    print("2. List and Remove Files")
-    print("3. Ask Questions About Knowledge Base")
-    print("4. Exit")
-    print("\nSelect an option (1-4): ")
-
-async def handle_add_file():
-    """Handle adding a file to the knowledge base"""
-    while True:
-        await print_menu()
-        choice = input("\nSelect an option (1-4): ")
-
-        if choice == "1":
-            # Get file path
-            file_path = input("\nEnter the path to the file: ")
-
-            try:
-                # Process file and get chunks
-                chunks = process_file(file_path)
-
-                if chunks:
-                    print(f"\nSuccessfully added {file_path} to the knowledge base")
-
-                    # Show current files in database
-                    print("\nCurrent files in knowledge base:")
-                    files = list_files_in_db()
-                    for i, file in enumerate(files, 1):
-                        print(f"{i}. {file}")
-
-                else:
-                    print(f"\nFailed to add {file_path} to the knowledge base")
-
-            except Exception as e:
-                print(f"\nError processing file: {e}")
-
-            input("\nPress Enter to continue...")
-
-        elif choice == "2":
-            return
-        else:
-            print("\nInvalid option")
-            input("\nPress Enter to continue...")
-
-async def handle_list_and_remove():
-    """Handle listing and removing files"""
-    while True:
-        clear_screen()
-        print("\n=== List and Remove Files ===")
-        files = list_files_in_db()
-
-        if not files:
-            input("\nPress Enter to return to main menu...")
-            return
-
-        print("\nOptions:")
-        print("1. Remove a file")
-        print("2. Return to main menu")
-
-        choice = input("\nSelect an option (1-2): ")
-
-        if choice == "1":
-            file_num = input("\nEnter the number of the file to remove: ")
-            try:
-                file_num = int(file_num)
-                if 1 <= file_num <= len(files):
-                    file_to_remove = files[file_num - 1]
-                    confirm = input(f"\nAre you sure you want to remove '{file_to_remove}'? (y/n): ")
-                    if confirm.lower() == 'y':
-                        if remove_file_from_db(file_to_remove):
-                            print(f"\nSuccessfully removed {file_to_remove}")
-                        else:
-                            print(f"\nFailed to remove {file_to_remove}")
-                    else:
-                        print("\nOperation cancelled")
-                    input("\nPress Enter to continue...")
-                else:
-                    print("\nInvalid file number")
-                    input("\nPress Enter to continue...")
-            except ValueError:
-                print("\nInvalid input")
-                input("\nPress Enter to continue...")
-        elif choice == "2":
-            return
-        else:
-            print("\nInvalid option")
-            input("\nPress Enter to continue...")
-
-async def main():
-    """Main interactive menu loop"""
-    while True:
-        await print_menu()
-        choice = input().strip()
-
-        if choice == "1":
-            await handle_add_file()
-        elif choice == "2":
-            await handle_list_and_remove()
-        elif choice == "3":
-            query = input("\nEnter your question: ")
-            context = input("\nOptional - Provide any additional context: ")
-            response = await handle_questions(query, context)
-            print("\nResponse:")
-            print(json.dumps(response, indent=2, ensure_ascii=False))
-            input("\nPress Enter to continue...")
-        elif choice == "4":
-            print("\nGoodbye!")
-            break
-        else:
-            print("\nInvalid option")
-            input("\nPress Enter to continue...")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Define the system prompt
+    system_prompt = (
+        "You're a dice game, you should roll the die and see if the number "
+        "you get back matches the user's guess. If so, tell them they're a winner. "
+        "Use the player's name in the response."
+    )
+
+    # Create a DynamicAgent instance with the specified model type and system prompt
+    model_manager = DynamicAgent("gpt-4o-mini", system_prompt)
+
+
+    # Define tools
+    def roll_die() -> str:
+        """Roll a six-sided die and return the result."""
+        return str(random.randint(1, 6))
+
+
+    def get_player_name(ctx: RunContext[Dict[str, Any]]) -> str:
+        """Get the player's name."""
+        return ctx.deps.get("player_name", "Unknown Player")
+
+
+    def get_current_time() -> str:
+        """Get the current time."""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+    def get_user_guess(ctx: RunContext[Dict[str, Any]]) -> str:
+        """Get the user's guess."""
+        return ctx.deps.get("user_guess", "No guess provided")
+
+
+    # Add tools to the agent
+    model_manager.add_tool(roll_die, "tool_plain")
+    model_manager.add_tool(get_player_name, "tool")
+    model_manager.add_tool(get_current_time, "tool_plain")
+    model_manager.add_tool(get_user_guess, "tool")
+
+    # Interact with the model
+
+    # Prepare deps with additional context
+
+    try:
+        while True:
+            user_input = input("Let's play a game! Guess a number between 1 and 6 (or type 'exit' to quit): ")
+            if user_input.lower() == 'exit':
+                break
+
+            deps = {
+                "player_name": "FC",
+                "user_guess": user_input,
+            }
+
+            response = model_manager.interact_with_model(user_input, deps=deps)
+            print(response)
+
+            # Optionally print chat history
+            print("\nChat History:")
+            for message in model_manager.get_chat_history():
+                print(f"{message['role'].capitalize()}: {message['content']}")
+            print("\n")
+    except ValueError as e:
+        logger.error(f"Error: {e}")
