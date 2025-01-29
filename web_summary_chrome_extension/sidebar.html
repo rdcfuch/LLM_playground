@@ -7,7 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -16,8 +18,8 @@
                 <span class="material-icons">summarize</span>
                 Web Page Summarizer
                 <select id="language" class="language-toggle">
-                    <option value="english" selected>EN</option>
-                    <option value="chinese">中</option>
+                    <option value="english">EN</option>
+                    <option value="chinese" selected>中</option>
                 </select>
                 <span class="material-icons language-icon">language</span>
             </h1>
@@ -26,9 +28,9 @@
             <div class="card summary-controls">
                 <div class="select-wrapper">
                     <label for="length">Summary Length</label>
-                    <select id="length" class="material-select" defaultValue="short">
-                        <option value="short" selected>Short</option>
-                        <option value="medium">Medium</option>
+                    <select id="length" class="material-select">
+                        <option value="short">Short</option>
+                        <option value="medium" selected>Medium</option>
                         <option value="long">Long</option>
                     </select>
                 </div>

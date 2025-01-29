@@ -1,7 +1,9 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const DeepSeek_MODEL = "deepseek-chat";
-    const DeepSeek_BASE_URL = "https://api.deepseek.com";
+// DeepSeek API Configuration
+const DeepSeek_MODEL = "deepseek-chat";
+const DeepSeek_BASE_URL = "https://api.deepseek.com";
+const DeepSeek_API_KEY = "sk-1577baabe3574262b21c2e2f249ac597";
 
+document.addEventListener('DOMContentLoaded', () => {
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
     const lengthSelect = document.getElementById('length');
@@ -24,6 +26,26 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.set({
             summaryLength: lengthSelect.value
         });
+    });
+
+    // Set default language to Chinese if not set
+    chrome.storage.local.get(['summaryLanguage'], (result) => {
+        if (!result.summaryLanguage) {
+            chrome.storage.local.set({ 'summaryLanguage': 'chinese' });
+        }
+        // Update the language selector to match storage
+        const languageSelect = document.getElementById('language');
+        languageSelect.value = result.summaryLanguage || 'chinese';
+    });
+
+    // Set default length to medium and store preference
+    chrome.storage.local.get(['summaryLength'], (result) => {
+        if (!result.summaryLength) {
+            chrome.storage.local.set({ 'summaryLength': 'medium' });
+        }
+        // Update the length selector to match storage
+        const lengthSelect = document.getElementById('length');
+        lengthSelect.value = result.summaryLength || 'medium';
     });
 
     async function generateSuggestedQuestions(summary) {
@@ -83,10 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiKey = await getApiKey();
             const answer = await generateAnswer(question, result.currentSummary, apiKey);
             
-            const answerElement = document.createElement('div');
-            answerElement.textContent = answer;
-            answerContainer.innerHTML = '';
-            answerContainer.appendChild(answerElement);
+            displayAnswer(answer);
         } catch (error) {
             answerContainer.textContent = 'Error: ' + error.message;
         }
@@ -110,8 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiKey = await getApiKey();
             const summary = await generateSummary(pageContent, lengthSelect.value, apiKey);
             
-            summaryElement.innerHTML = summary;
-            summaryElement.classList.remove('hidden');
+            displaySummary(summary);
             questionsSection.classList.remove('hidden');
             
             // Generate and display suggested questions
@@ -150,56 +168,122 @@ function getPageContent() {
 
 // Function to generate summary using DeepSeek
 async function generateSummary(content, length, apiKey) {
-    const maxLength = {
-        short: 100,
-        medium: 200,
-        long: 400
-    }[length] || 200;
+    let lengthPrompt;
+    switch (length) {
+        case 'short':
+            lengthPrompt = 'concise (about 100 words)';
+            break;
+        case 'medium':
+            lengthPrompt = 'moderate length (about 200 words)';
+            break;
+        case 'long':
+            lengthPrompt = 'detailed (about 400 words)';
+            break;
+        default:
+            lengthPrompt = 'moderate length (about 200 words)';
+    }
 
-    const prompt = `请用中文总结以下内容，重点突出主要信息。总结长度限制在${maxLength}字以内。请以HTML格式返回，使用<h2>标题</h2>和<ul><li>要点</li></ul>的形式组织内容：\n\n${content}`;
+    const prompt = `Please provide a ${lengthPrompt} summary of the following webpage content. Return the response in HTML format with the following structure:
 
-    return await fetchWithRetry(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: DeepSeek_MODEL,
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: maxLength * 2,
-            temperature: 0.7
-        })
-    });
+<div class="summary-section">
+    <h2>Summary: [Title]</h2>
+    <div class="overview">[Overview paragraph with <strong>important terms</strong> highlighted]</div>
+    
+    <h3>Key Points:</h3>
+    <ul>
+        <li>[Point 1 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 2 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 3 with <strong>key terms</strong> highlighted]</li>
+    </ul>
+    
+    <div class="important-terms">
+        <h3>Important Terms:</h3>
+        <ul>
+            <li><strong>[Term 1]</strong>: [Brief description]</li>
+            <li><strong>[Term 2]</strong>: [Brief description]</li>
+        </ul>
+    </div>
+</div>
+
+Content to summarize:
+
+${content}`;
+
+    try {
+        const response = await fetch(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: DeepSeek_MODEL,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 500,
+                temperature: 0.7
+            })
+        });
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        throw new Error(`API request failed: ${error.message}`);
+    }
 }
 
 // Function to generate answer using DeepSeek
 async function generateAnswer(question, summary, apiKey) {
-    const prompt = `基于这段总结:\n${summary}\n\n请回答这个问题:\n${question}`;
+    const prompt = `Based on this summary:
 
-    return await fetchWithRetry(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: DeepSeek_MODEL,
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: 200,
-            temperature: 0.7
-        })
-    });
+${summary}
+
+Please answer this question: "${question}"
+
+Return the response in HTML format with the following structure:
+
+<div class="answer-section">
+    <div class="main-answer">[Main answer with <strong>important terms</strong> highlighted]</div>
+    
+    <h3>Supporting Points:</h3>
+    <ul>
+        <li>[Point 1 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 2 with <strong>key terms</strong> highlighted]</li>
+    </ul>
+    
+    <div class="key-highlight">
+        <h3>Key Highlight:</h3>
+        <blockquote>[Important quote or highlight related to the answer]</blockquote>
+    </div>
+</div>`;
+
+    try {
+        const response = await fetch(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: DeepSeek_MODEL,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 200,
+                temperature: 0.7
+            })
+        });
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        throw new Error(`API request failed: ${error.message}`);
+    }
 }
 
 // Helper function to handle fetch with retry for 429 errors
@@ -250,3 +334,39 @@ function setApiKey(apiKey) {
 
 // Example usage to set the API key (you can call this from a settings page or similar)
 // setApiKey('sk-1577baabe3574262b21c2e2f249ac597');
+
+// Configure marked options
+marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: false,
+    mangle: false
+});
+
+// Function to safely render markdown
+function renderMarkdown(content) {
+    try {
+        return marked.parse(content);
+    } catch (error) {
+        console.error('Error parsing markdown:', error);
+        return content;
+    }
+}
+
+// Function to clean model output
+function cleanModelOutput(output) {
+    // Remove ```html and ``` if present
+    return output.replace(/^```html\n?/, '').replace(/```$/, '').trim();
+}
+
+// Update the display functions to use cleaned output
+function displaySummary(summary) {
+    const summaryElement = document.getElementById('summary');
+    summaryElement.innerHTML = cleanModelOutput(summary);
+    summaryElement.classList.remove('hidden');
+}
+
+function displayAnswer(answer) {
+    const answerContainer = document.getElementById('answer-container');
+    answerContainer.innerHTML = cleanModelOutput(answer);
+}

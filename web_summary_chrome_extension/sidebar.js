@@ -1,6 +1,9 @@
+// DeepSeek API Configuration
+const DeepSeek_MODEL = "deepseek-chat";
+const DeepSeek_BASE_URL = "https://api.deepseek.com";
+const API_KEY = "sk-1577baabe3574262b21c2e2f249ac597";
+
 document.addEventListener('DOMContentLoaded', async () => {
-    const API_KEY = "sk-e2elzR10u4Tv2UXxx9kYC6Te0OrzM87qlpgHJsWVjzHd6Ouw";
-    
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
     const lengthSelect = document.getElementById('length');
@@ -21,15 +24,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         summarizeCurrentPage();
     }
 
-    // Set default language to English if not already set
-    if (!result.summaryLanguage) {
-        chrome.storage.local.set({ summaryLanguage: 'english' });
-    }
-    languageSelect.value = result.summaryLanguage || 'english';
+    // Set default language to Chinese if not set
+    chrome.storage.local.get(['summaryLanguage'], (result) => {
+        if (!result.summaryLanguage) {
+            chrome.storage.local.set({ 'summaryLanguage': 'chinese' });
+        }
+        // Update the language selector to match storage
+        languageSelect.value = result.summaryLanguage || 'chinese';
+    });
 
-    // Always set to short and clear any existing preference
-    lengthSelect.value = 'short';
-    chrome.storage.local.set({ summaryLength: 'short' });
+    // Set default length to medium and store preference
+    chrome.storage.local.get(['summaryLength'], (result) => {
+        if (!result.summaryLength) {
+            chrome.storage.local.set({ 'summaryLength': 'medium' });
+        }
+        // Update the length selector to match storage
+        lengthSelect.value = result.summaryLength || 'medium';
+    });
 
     // Save preferences when changed
     lengthSelect.addEventListener('change', () => {
@@ -47,14 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function generateSuggestedQuestions(summary) {
         const prompt = `Based on this summary, generate 3 follow-up questions that would be interesting to ask. Return them in a JSON array format. Example: ["Question 1?", "Question 2?", "Question 3?"]. Questions should be concise and focused:\n\n${summary}`;
 
-        const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+        const response = await fetch(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${API_KEY}`
             },
             body: JSON.stringify({
-                model: 'moonshot-v1-8k',
+                model: DeepSeek_MODEL,
                 messages: [
                     {
                         role: 'user',
@@ -110,10 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const answer = await generateAnswer(question, result.currentSummary, API_KEY);
             
-            const answerElement = document.createElement('div');
-            answerElement.textContent = answer;
-            answerContainer.innerHTML = '';
-            answerContainer.appendChild(answerElement);
+            displayAnswer(answer);
         } catch (error) {
             answerContainer.textContent = 'Error: ' + error.message;
         }
@@ -148,8 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 const summary = await generateSummary(pageContent, lengthSelect.value, API_KEY);
-                summaryElement.innerHTML = summary;
-                summaryElement.classList.remove('hidden');
+                displaySummary(summary);
                 questionsSection.classList.remove('hidden');
                 
                 // Generate and display suggested questions
@@ -192,6 +199,167 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         return true;
     });
+
+    // Configure marked options
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        headerIds: false,
+        mangle: false
+    });
+
+    // Function to safely render markdown
+    function renderMarkdown(content) {
+        try {
+            return marked.parse(content);
+        } catch (error) {
+            console.error('Error parsing markdown:', error);
+            return content;
+        }
+    }
+
+    async function generateSummary(content, length, apiKey) {
+        const language = await chrome.storage.local.get(['summaryLanguage']).then(result => result.summaryLanguage || 'english');
+        const languagePrompt = language === 'chinese' ? '请用中文（简体）总结。' : 'Please summarize in English.';
+        
+        let lengthPrompt;
+        switch (length) {
+            case 'short':
+                lengthPrompt = 'concise (about 100 words)';
+                break;
+            case 'medium':
+                lengthPrompt = 'moderate length (about 200 words)';
+                break;
+            case 'long':
+                lengthPrompt = 'detailed (about 400 words)';
+                break;
+            default:
+                lengthPrompt = 'moderate length (about 200 words)';
+        }
+
+        const prompt = `${languagePrompt} Please provide a ${lengthPrompt} summary of the following webpage content. Return the response in HTML format with the following structure:
+
+<div class="summary-section">
+    <h2>Summary: [Title]</h2>
+    <div class="overview">[Overview paragraph with <strong>important terms</strong> highlighted]</div>
+    
+    <h3>Key Points:</h3>
+    <ul>
+        <li>[Point 1 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 2 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 3 with <strong>key terms</strong> highlighted]</li>
+    </ul>
+    
+    <div class="important-terms">
+        <h3>Important Terms:</h3>
+        <ul>
+            <li><strong>[Term 1]</strong>: [Brief description]</li>
+            <li><strong>[Term 2]</strong>: [Brief description]</li>
+        </ul>
+    </div>
+</div>
+
+Content to summarize:
+
+${content}`;
+
+        const response = await fetch(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: DeepSeek_MODEL,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 500,
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate summary');
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+    }
+
+    // Function to generate answer using DeepSeek API
+    async function generateAnswer(question, summary, apiKey) {
+        const prompt = `Based on this summary:
+
+${summary}
+
+Please answer this question: "${question}"
+
+Return the response in HTML format with the following structure:
+
+<div class="answer-section">
+    <div class="main-answer">[Main answer with <strong>important terms</strong> highlighted]</div>
+    
+    <h3>Supporting Points:</h3>
+    <ul>
+        <li>[Point 1 with <strong>key terms</strong> highlighted]</li>
+        <li>[Point 2 with <strong>key terms</strong> highlighted]</li>
+    </ul>
+    
+    <div class="key-highlight">
+        <h3>Key Highlight:</h3>
+        <blockquote>[Important quote or highlight related to the answer]</blockquote>
+    </div>
+</div>`;
+
+        const response = await fetch(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: DeepSeek_MODEL,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 200,
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate answer');
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+    }
+
+    // Function to clean model output
+    function cleanModelOutput(output) {
+        // Remove ```html and ``` if present
+        return output.replace(/^```html\n?/, '').replace(/```$/, '').trim();
+    }
+
+    // Function to display summary
+    function displaySummary(summary) {
+        const summaryElement = document.getElementById('summary');
+        summaryElement.innerHTML = cleanModelOutput(summary);
+        summaryElement.classList.remove('hidden');
+    }
+
+    // Function to display answer
+    function displayAnswer(answer) {
+        const answerContainer = document.getElementById('answer-container');
+        answerContainer.innerHTML = cleanModelOutput(answer);
+    }
 });
 
 // Function to get page content
@@ -230,75 +398,4 @@ async function getPageContent() {
     }
     
     return content.trim();
-}
-
-// Function to generate summary using Kimi API
-async function generateSummary(content, length, apiKey) {
-    const language = await chrome.storage.local.get(['summaryLanguage']).then(result => result.summaryLanguage || 'english');
-    const languagePrompt = language === 'chinese' ? 'Please summarize in Chinese (简体中文).' : 'Please summarize in English.';
-    
-    const lengthPrompts = {
-        short: "Provide a very concise summary in 2-3 sentences.",
-        medium: "Provide a balanced summary in about 5-6 sentences.",
-        long: "Provide a detailed summary in about 8-10 sentences."
-    };
-
-    const prompt = `${languagePrompt} Please provide a ${length} summary of the following webpage content:\n\n${content}`;
-
-    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'moonshot-v1-8k',
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: 500,
-            temperature: 0.7
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to generate summary');
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
-}
-
-// Function to generate answer using Kimi API
-async function generateAnswer(question, summary, apiKey) {
-    const prompt = `Based on this summary:\n${summary}\n\nPlease answer this question:\n${question}`;
-
-    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'moonshot-v1-8k',
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: 200,
-            temperature: 0.7
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to generate answer');
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
 }

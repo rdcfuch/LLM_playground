@@ -4,7 +4,9 @@
     <title>Web Page Summarizer</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -13,6 +15,13 @@
         </header>
         <main>
             <div class="card summary-controls">
+                <div class="select-wrapper">
+                    <label for="language">Language</label>
+                    <select id="language" class="language-toggle">
+                        <option value="english">EN</option>
+                        <option value="chinese" selected>中</option>
+                    </select>
+                </div>
                 <div class="select-wrapper">
                     <label for="length">Summary Length</label>
                     <select id="length" class="material-select">
