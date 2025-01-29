@@ -14,17 +14,17 @@ logger = logging.getLogger(__name__)
 class DynamicModel:
     """
     A class to dynamically create and manage models using API keys, model names, and base URLs.
-    Supports GPT-4, Kimi (Moonshot), and DeepSeek models.
+    Supports GPT-4, Kimi (Moonshot), DeepSeek, and Ollama models.
     """
 
-    SUPPORTED_MODELS = ["gpt-4o-mini", "kimi", "deepseek"]
+    SUPPORTED_MODELS = ["gpt-4o-mini", "kimi", "deepseek", "ollama"]
 
     def __init__(self, model_type: str):
         """
         Initialize the DynamicModel class. Load environment variables from .env file and create the specified model.
 
         Args:
-            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek", "ollama".
         """
         # Get the project root directory (one level up from this script)
         PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,7 +37,10 @@ class DynamicModel:
         self.deepseek_api_key: Optional[str] = os.getenv("DeepSeek_API_KEY")
         self.deepseek_model: Optional[str] = os.getenv("DeepSeek_MODEL")
         self.deepseek_base_url: Optional[str] = os.getenv("DeepSeek_BASE_URL")
-        self.model: Optional[OpenAIModel] = None
+        self.ollama_api_key: Optional[str] = os.getenv("OLLAMA_API_KEY")
+        self.ollama_api_key: Optional[str] = os.getenv("OLLAMA_API_KEY")
+        self.ollama_model: Optional[str] = os.getenv("OLLAMA_MODEL", "deepseek-r1:14b")  # Default to "deepseek-r1:14b"
+        self.ollama_base_url: Optional[str] = os.getenv("OLLAMA_BASE_URL")
 
         self.create_model(model_type)
 
@@ -46,7 +49,7 @@ class DynamicModel:
         Dynamically create a model based on the specified model type.
 
         Args:
-            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek", "ollama".
 
         Raises:
             ValueError: If the model type is not supported or required environment variables are missing.
@@ -84,6 +87,24 @@ class DynamicModel:
             )
             logger.info(f"Created DeepSeek model: {self.model}")
 
+
+        elif model_type.lower() == "ollama":
+
+            if not self.ollama_api_key or not self.ollama_model or not self.ollama_base_url:
+                raise ValueError("OLLAMA_API_KEY, OLLAMA_MODEL, or OLLAMA_BASE_URL not found in .env file.")
+
+            self.model = OpenAIModel(
+
+                model_name=self.ollama_model,
+
+                api_key=self.ollama_api_key,
+
+                base_url=self.ollama_base_url,
+
+            )
+
+            logger.info(f"Created Ollama model: {self.model}")
+
     def get_model(self) -> OpenAIModel:
         """
         Get the created model instance.
@@ -112,7 +133,7 @@ class DynamicAgent:
         Initialize the DynamicAgent class. Create a model using DynamicModel and set up the agent.
 
         Args:
-            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek".
+            model_type (str): The type of model to create. Supported values: "gpt-4o-mini", "kimi", "deepseek", "ollama".
             system_prompt (str): The system prompt to use for the agent.
         """
         self.model_manager = DynamicModel(model_type)
@@ -215,7 +236,7 @@ if __name__ == "__main__":
     )
 
     # Create a DynamicAgent instance with the specified model type and system prompt
-    model_manager = DynamicAgent("gpt-4o-mini", system_prompt)
+    model_manager = DynamicAgent("ollama", system_prompt)
 
 
     # Define tools
@@ -247,9 +268,6 @@ if __name__ == "__main__":
     model_manager.add_tool(get_user_guess, "tool")
 
     # Interact with the model
-
-    # Prepare deps with additional context
-
     try:
         while True:
             user_input = input("Let's play a game! Guess a number between 1 and 6 (or type 'exit' to quit): ")

@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_KEY = "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";
-    
+    const DeepSeek_MODEL = "deepseek-chat";
+    const DeepSeek_BASE_URL = "https://api.deepseek.com";
+
     const summarizeButton = document.getElementById('summarize');
     const askQuestionButton = document.getElementById('ask-question');
     const lengthSelect = document.getElementById('length');
@@ -28,14 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function generateSuggestedQuestions(summary) {
         const prompt = `基于这段总结，生成3个最重要的后续问题。请用中文回答，以JSON数组格式返回。示例：["问题1？", "问题2？", "问题3？"]。问题应该简洁且有针对性：\n\n${summary}`;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const apiKey = await getApiKey();
+        return await fetchWithRetry(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
+                model: DeepSeek_MODEL,
                 messages: [
                     {
                         role: 'user',
@@ -46,17 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 temperature: 0.7
             })
         });
-
-        if (!response.ok) {
-            throw new Error('Failed to generate questions');
-        }
-
-        const data = await response.json();
-        try {
-            return JSON.parse(data.choices[0].message.content);
-        } catch (e) {
-            return [];
-        }
     }
 
     function displaySuggestedQuestions(questions) {
@@ -89,7 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Please generate a summary first');
             }
 
-            const answer = await generateAnswer(question, result.currentSummary, API_KEY);
+            const apiKey = await getApiKey();
+            const answer = await generateAnswer(question, result.currentSummary, apiKey);
             
             const answerElement = document.createElement('div');
             answerElement.textContent = answer;
@@ -115,7 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const pageContent = result[0].result;
-            const summary = await generateSummary(pageContent, lengthSelect.value, API_KEY);
+            const apiKey = await getApiKey();
+            const summary = await generateSummary(pageContent, lengthSelect.value, apiKey);
             
             summaryElement.innerHTML = summary;
             summaryElement.classList.remove('hidden');
@@ -155,7 +148,7 @@ function getPageContent() {
     return mainContent.trim();
 }
 
-// Function to generate summary using ChatGPT
+// Function to generate summary using DeepSeek
 async function generateSummary(content, length, apiKey) {
     const maxLength = {
         short: 100,
@@ -165,14 +158,14 @@ async function generateSummary(content, length, apiKey) {
 
     const prompt = `请用中文总结以下内容，重点突出主要信息。总结长度限制在${maxLength}字以内。请以HTML格式返回，使用<h2>标题</h2>和<ul><li>要点</li></ul>的形式组织内容：\n\n${content}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    return await fetchWithRetry(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: DeepSeek_MODEL,
             messages: [
                 {
                     role: 'user',
@@ -183,28 +176,20 @@ async function generateSummary(content, length, apiKey) {
             temperature: 0.7
         })
     });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to generate summary');
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
 }
 
-// Function to generate answer using ChatGPT
+// Function to generate answer using DeepSeek
 async function generateAnswer(question, summary, apiKey) {
     const prompt = `基于这段总结:\n${summary}\n\n请回答这个问题:\n${question}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    return await fetchWithRetry(`${DeepSeek_BASE_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
+            model: DeepSeek_MODEL,
             messages: [
                 {
                     role: 'user',
@@ -215,24 +200,53 @@ async function generateAnswer(question, summary, apiKey) {
             temperature: 0.7
         })
     });
+}
 
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to generate answer');
+// Helper function to handle fetch with retry for 429 errors
+async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (response.status === 429) {
+                    console.warn(`Rate limit exceeded. Retrying in ${delay / 1000} seconds...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Exponential backoff
+                    continue;
+                } else {
+                    throw new Error(`API request failed with status ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+                }
+            }
+            return await response.json();
+        } catch (error) {
+            if (i === retries - 1) {
+                throw error; // Rethrow the last error
+            }
+            console.error(`Fetch attempt ${i + 1} failed. Retrying...`);
+        }
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
 }
 
-// Function to show notification
-function showNotification(message, isError = false) {
-    const notification = document.createElement('div');
-    notification.className = `notification ${isError ? 'error' : 'success'}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
+// Function to get API key from storage
+async function getApiKey() {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get(['DeepSeek_API_KEY'], (result) => {
+            if (result.DeepSeek_API_KEY) {
+                resolve(result.DeepSeek_API_KEY);
+            } else {
+                reject(new Error('API key not found in storage'));
+            }
+        });
+    });
 }
+
+// Function to set API key in storage
+function setApiKey(apiKey) {
+    chrome.storage.local.set({ 'DeepSeek_API_KEY': apiKey }, () => {
+        console.log('API key stored successfully');
+    });
+}
+
+// Example usage to set the API key (you can call this from a settings page or similar)
+// setApiKey('sk-1577baabe3574262b21c2e2f249ac597');
