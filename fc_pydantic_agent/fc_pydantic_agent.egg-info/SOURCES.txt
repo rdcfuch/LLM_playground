@@ -1,0 +1,11 @@
+README.md
+setup.py
+fc_pydantic_agent/__init__.py
+fc_pydantic_agent/agent.py
+fc_pydantic_agent/models.py
+fc_pydantic_agent.egg-info/PKG-INFO
+fc_pydantic_agent.egg-info/SOURCES.txt
+fc_pydantic_agent.egg-info/dependency_links.txt
+fc_pydantic_agent.egg-info/entry_points.txt
+fc_pydantic_agent.egg-info/requires.txt
+fc_pydantic_agent.egg-info/top_level.txt

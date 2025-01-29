@@ -1,0 +1,2 @@
+[console_scripts]
+fc-dice-game = fc_pydantic_agent.examples.dice_game_example:main
