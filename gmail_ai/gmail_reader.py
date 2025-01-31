@@ -18,6 +18,89 @@ class UpdatedAddress:
     def __repr__(self):
         return f"UpdatedAddress(subject='{self.subject}', timestamp='{self.timestamp}')"
 
+def get_email_body_by_subject(subject: str) -> str:
+    """
+    Retrieve the full email body based on the exact subject.
+    
+    Parameters:
+        subject (str): The exact subject of the email to retrieve.
+        
+    Returns:
+        str: The decoded email body content.
+    """
+    service = get_gmail_service()
+    
+    # Search for emails with the exact subject
+    results = service.users().messages().list(
+        userId='me',
+        q=f'subject:"{subject}"'
+    ).execute()
+    messages = results.get('messages', [])
+    
+    if not messages:
+        raise ValueError(f"No email found with subject: {subject}")
+    
+    # Get the first matching email
+    message_id = messages[0]['id']
+    msg = service.users().messages().get(
+        userId='me',
+        id=message_id,
+        format='full'
+    ).execute()
+    
+    # Extract the email body
+    payload = msg['payload']
+    body = ""
+    
+    if 'parts' in payload:
+        # Handle multipart emails (e.g., text/plain and text/html)
+        for part in payload['parts']:
+            mime_type = part['mimeType']
+            data = part['body'].get('data', '')
+            if mime_type == 'text/plain' and data:
+                body += base64.urlsafe_b64decode(data).decode('utf-8')
+            elif mime_type == 'text/html' and data:
+                body += base64.urlsafe_b64decode(data).decode('utf-8')
+    else:
+        # Handle single-part emails
+        data = payload['body'].get('data', '')
+        if data:
+            body = base64.urlsafe_b64decode(data).decode('utf-8')
+    
+    return body.strip()
+
+def mark_mail_as_read_with_subject(subject: str):
+    """
+    Marks the email with the given subject as read by removing the 'UNREAD' label.
+    
+    Parameters:
+        subject (str): The exact subject of the email to mark as read.
+    """
+    service = get_gmail_service()
+    
+    # Search for emails with the exact subject
+    results = service.users().messages().list(
+        userId='me',
+        q=f'subject:"{subject}"'
+    ).execute()
+    messages = results.get('messages', [])
+    
+    if not messages:
+        print(f"No email found with subject: {subject}")
+        return
+    
+    # Get the first matching email
+    message_id = messages[0]['id']
+    
+    # Remove the 'UNREAD' label to mark the email as read
+    service.users().messages().modify(
+        userId='me',
+        id=message_id,
+        body={'removeLabelIds': ['UNREAD']}
+    ).execute()
+    
+    print(f"Email with subject '{subject}' has been marked as read.")
+
 def get_gmail_service():
     """
     创建并返回 Gmail API 客户端实例。
@@ -139,36 +222,6 @@ def list_all_updated_address(number_of_latest_email_to_check: int, keyword: str)
     return matched_emails
 
 if __name__ == '__main__':
-    # import argparse
-    # parser = argparse.ArgumentParser(description='Read Gmail inbox')
-    # parser.add_argument('--subject', help='Get full body of email with specific subject')
-    # parser.add_argument('--filter', help='Filter subjects by keyword')
-    # parser.add_argument('--max', type=int, default=10, help='Max emails to check')
-    # parser.add_argument('--unread', action='store_true', help='Show only unread emails')
-    # parser.add_argument('--recent', action='store_true', help='Show recent email subjects')
-    # parser.add_argument('--updated', action='store_true', help='List updated addresses with keyword')
-    # parser.add_argument('--keyword', help='Keyword to search in emails')
-    # args = parser.parse_args()
-    
-    # if args.subject:
-    #     print("\nSubject-based search is no longer supported.")
-    # elif args.unread:
-    #     print("\nUnread Email Subjects:")
-    #     list_unread_subjects(args.max, args.filter)
-    # elif args.recent:
-    #     print("\nRecent Email Subjects:")
-    #     list_recent_subjects(args.max)
-    # elif args.updated and args.keyword:
-    #     print(f"\nChecking latest {args.max} emails for keyword '{args.keyword}':")
-    #     matched_emails = list_all_updated_address(args.max, args.keyword)
-    #     if not matched_emails:
-    #         print("No matching emails found.")
-    # elif args.filter:
-    #     print(f"\nSubjects containing '{args.filter}':")
-    #     list_unread_subjects(args.max, args.filter)
-    # else:
-    #     print("\nLatest Inbox Subjects:")
-    #     list_unread_subjects(args.max)
     
     updated_addresses = list_all_updated_address(100, "update")
     print(updated_addresses)
