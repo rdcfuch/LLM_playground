@@ -28,6 +28,7 @@ class EmbeddingConfig(BaseModel):
     openai_api_key: Optional[str] = Field(default=os.getenv('OPENAI_API_KEY'))
     openai_model: str = Field(default=os.getenv('OPENAI_MODEL', 'text-embedding-ada-002'))
     ollama_base_url: Optional[str] = Field(default=os.getenv('OLLAMA_BASE_URL'))
+    ollama_embedding_url: Optional[str] = Field(default=os.getenv('OLLAMA_EMBEDDING_URL'))
     ollama_model: str = Field(default=os.getenv('OLLAMA_MODEL', 'llama3.2:latest'))
     chunk_size: int = Field(default=int(os.getenv('CHUNK_SIZE', '500')))
     chunk_overlap: int = Field(default=int(os.getenv('CHUNK_OVERLAP', '50')))

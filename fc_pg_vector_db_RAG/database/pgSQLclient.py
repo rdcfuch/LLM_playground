@@ -2,6 +2,11 @@ import psycopg2
 from psycopg2 import sql
 import json
 from typing import Dict, Any
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DB_CONFIG, TABLE_SCHEMA
 
 class PostgreSQLClient:
     def __init__(self, host, database, user, password, embedding_dimension):
