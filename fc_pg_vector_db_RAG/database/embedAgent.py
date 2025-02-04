@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import logging
+import ollama
 
 # Add parent directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,7 +36,7 @@ class EmbeddingAgent:
             return self._get_openai_embedding
             
         elif service_type == "ollama":
-            if not self.config.embedding.ollama_base_url:
+            if not self.config.embedding.ollama_embedding_url:
                 raise ValueError("Ollama base URL must be provided in config")
             return self._get_ollama_embedding
             
@@ -72,20 +73,47 @@ class EmbeddingAgent:
         except Exception as e:
             logging.error(f"Error generating embedding: {str(e)}")
             raise
-
+    
     def _get_ollama_embedding(self, text: str) -> List[float]:
-        """Get embedding from a local Ollama service."""
-        url = f"{self.config.embedding.ollama_base_url}/embed"
-        payload = {
-            "model": self.config.embedding.ollama_model,
-            "input": text
-        }
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            return response.json().get("embedding")
-        else:
-            raise Exception(f"Ollama embedding request failed: {response.text}")
-
+        """Get embedding from Ollama's API using ollama library."""
+        text = text.replace("\n", " ")
+        start_time = time.time()
+        try:
+            response = ollama.embed(
+                model=self.config.embedding.ollama_model,
+                input=text
+            )
+            if "embeddings" not in response:
+                raise ValueError(f"Unexpected response format from Ollama API: {response}")
+            
+            # Ensure embeddings is a 1-D array
+            embedding = response["embeddings"]
+            if not isinstance(embedding, list):
+                raise ValueError(f"Expected list type for embedding, got {type(embedding)}")
+                
+            # Handle both single array and nested array formats
+            if len(embedding) > 0 and isinstance(embedding[0], list):
+                # If we get a 2-D array with one subarray, take the first subarray
+                if len(embedding) == 1:
+                    embedding = embedding[0]
+                else:
+                    # If we get multiple subarrays, flatten them
+                    embedding = [item for sublist in embedding for item in sublist]
+                    
+            # Validate the flattened embedding
+            if not embedding or not all(isinstance(x, (int, float)) for x in embedding):
+                raise ValueError(f"Invalid embedding format: all elements must be numbers")
+                
+            logging.info(f"Embedding shape: {len(embedding)} dimensions")
+                
+            elapsed_time = time.time() - start_time
+            logging.info(f"Embedding generated in {elapsed_time:.3f} seconds")
+            return embedding
+        except Exception as e:
+            logging.error(f"Error generating Ollama embedding: {str(e)}")
+            raise
+        
+ 
     def _chunk_text(self, text: str) -> List[str]:
         """Chunk the input text into smaller pieces."""
         chunk_size = self.config.embedding.chunk_size
