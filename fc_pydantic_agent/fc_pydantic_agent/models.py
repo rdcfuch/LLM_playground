@@ -3,6 +3,7 @@ import logging
 from dotenv import load_dotenv
 from typing import Optional
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.ollama import OllamaModel
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +58,13 @@ class DynamicModel:
                 base_url=self.deepseek_base_url,
             )
         elif model_type == "ollama":
-            if not all([self.ollama_api_key, self.ollama_model, self.ollama_base_url]):
-                raise ValueError("Missing Ollama API credentials in .env file.")
-            self.model = OpenAIModel(
+            if not all([self.ollama_model, self.ollama_base_url]):
+                raise ValueError("OLLAMA_MODEL or OLLAMA_BASE_URL not found in .env file.")
+            self.model = OllamaModel(
                 model_name=self.ollama_model,
-                api_key=self.ollama_api_key,
                 base_url=self.ollama_base_url,
             )
-        logger.info(f"Created {model_type} model: {self.model}")
+            logger.info(f"Created {model_type} model: {self.model}")
 
     def get_model(self) -> OpenAIModel:
         if not self.model:
