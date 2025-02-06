@@ -1,4 +1,4 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.1
 Name: fc_pydantic_agent
 Version: 0.1.2
 Summary: Flexible AI Agent Framework with Pydantic Validation
@@ -13,15 +13,6 @@ Description-Content-Type: text/markdown
 Requires-Dist: pydantic-ai>=0.0.20
 Requires-Dist: python-dotenv>=1.0.0
 Requires-Dist: loguru>=0.7.2
-Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
-Dynamic: home-page
-Dynamic: requires-dist
-Dynamic: requires-python
-Dynamic: summary
 
 # Pydantic Dicing Game
 
