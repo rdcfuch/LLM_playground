@@ -3,6 +3,7 @@ setup.py
 fc_pydantic_agent/__init__.py
 fc_pydantic_agent/agent.py
 fc_pydantic_agent/models.py
+fc_pydantic_agent/search_agent.py
 fc_pydantic_agent.egg-info/PKG-INFO
 fc_pydantic_agent.egg-info/SOURCES.txt
 fc_pydantic_agent.egg-info/dependency_links.txt

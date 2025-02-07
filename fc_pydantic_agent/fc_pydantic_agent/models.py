@@ -3,7 +3,6 @@ import logging
 from dotenv import load_dotenv
 from typing import Optional
 from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.models.ollama import OllamaModel
 
 logger = logging.getLogger(__name__)
 
@@ -11,19 +10,20 @@ class DynamicModel:
     SUPPORTED_MODELS = ["gpt-4o-mini", "kimi", "deepseek", "ollama"]
 
     def __init__(self, model_type: str):
-        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+        # Load environment variables from .env file
+        load_dotenv()
         
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        self.kimi_api_key = os.getenv("KIMI_API_KEY")
-        self.kimi_model = os.getenv("KIMI_MODEL")
-        self.kimi_base_url = os.getenv("KIMI_BASE_URL")
-        self.deepseek_api_key = os.getenv("DeepSeek_API_KEY")
-        self.deepseek_model = os.getenv("DeepSeek_MODEL")
-        self.deepseek_base_url = os.getenv("DeepSeek_BASE_URL")
-        self.ollama_api_key = os.getenv("OLLAMA_API_KEY")
-        self.ollama_model = os.getenv("OLLAMA_MODEL", "deepseek-r1:14b")
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL")
+        # Read environment variables
+        self.openai_api_key = os.environ.get("OPENAI_API_KEY")
+        self.kimi_api_key = os.environ.get("KIMI_API_KEY")
+        self.kimi_model = os.environ.get("KIMI_MODEL")
+        self.kimi_base_url = os.environ.get("KIMI_BASE_URL")
+        self.deepseek_api_key = os.environ.get("DeepSeek_API_KEY")
+        self.deepseek_model = os.environ.get("DeepSeek_MODEL")
+        self.deepseek_base_url = os.environ.get("DeepSeek_BASE_URL")
+        self.ollama_api_key = os.environ.get("OLLAMA_API_KEY")
+        self.ollama_model = os.environ.get("OLLAMA_MODEL", "deepseek-r1:14b")
+        self.ollama_base_url = os.environ.get("OLLAMA_BASE_URL")
         
         self.model: Optional[OpenAIModel] = None
         self.create_model(model_type)
@@ -59,9 +59,10 @@ class DynamicModel:
             )
         elif model_type == "ollama":
             if not all([self.ollama_model, self.ollama_base_url]):
-                raise ValueError("OLLAMA_MODEL or OLLAMA_BASE_URL not found in .env file.")
-            self.model = OllamaModel(
+                raise ValueError("Missing Ollama API credentials in .env file.")
+            self.model = OpenAIModel(
                 model_name=self.ollama_model,
+                api_key=self.ollama_api_key or "ollama",
                 base_url=self.ollama_base_url,
             )
             logger.info(f"Created {model_type} model: {self.model}")
