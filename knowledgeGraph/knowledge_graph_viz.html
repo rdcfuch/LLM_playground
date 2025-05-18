@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Graph Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <style type="text/css">
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+    </style>
+</head>
+<body>
+    <div id="network"></div>
+    <script type="text/javascript">
+        // Create nodes
+        var nodes = new vis.DataSet([{"id": "S&P", "label": "S&P\n(Organization)", "group": "Organization"}, {"id": "444 West Ocean Blvd, Long Beach", "label": "444 West Ocean Blvd, Long Beach\n(Property)", "group": "Property"}, {"id": "Jpmorgan", "label": "Jpmorgan\n(Organization)", "group": "Organization"}, {"id": "Premier Business Centers", "label": "Premier Business Centers\n(Organization)", "group": "Organization"}, {"id": "Los Angeles, Ca", "label": "Los Angeles, Ca\n(Location)", "group": "Location"}, {"id": "Tariffs And International Trade Risk", "label": "Tariffs And International Trade Risk\n(Event)", "group": "Event"}, {"id": "888 East Ocean, Short Beach", "label": "888 East Ocean, Short Beach\n(Property)", "group": "Property"}, {"id": "Wells Fargo", "label": "Wells Fargo\n(Organization)", "group": "Organization"}, {"id": "Premier Industry Centers", "label": "Premier Industry Centers\n(Organization)", "group": "Organization"}, {"id": "San Francisco, Ca", "label": "San Francisco, Ca\n(Location)", "group": "Location"}, {"id": "101 Market Street, Oakland", "label": "101 Market Street, Oakland\n(Property)", "group": "Property"}, {"id": "Citibank", "label": "Citibank\n(Organization)", "group": "Organization"}, {"id": "Bluewave Financial Group", "label": "Bluewave Financial Group\n(Organization)", "group": "Organization"}, {"id": "Flexstart Co-Working", "label": "Flexstart Co-Working\n(Organization)", "group": "Organization"}, {"id": "Local Regulatory Shifts And Commercial Zoning Reform", "label": "Local Regulatory Shifts And Commercial Zoning Reform\n(Event)", "group": "Event"}, {"id": "707 Mission Street, San Jose", "label": "707 Mission Street, San Jose\n(Property)", "group": "Property"}, {"id": "Bank Of America", "label": "Bank Of America\n(Organization)", "group": "Organization"}, {"id": "Innovatex Labs", "label": "Innovatex Labs\n(Organization)", "group": "Organization"}, {"id": "Bitcore Systems", "label": "Bitcore Systems\n(Organization)", "group": "Organization"}, {"id": "Interest Rate Volatility And Talent Migration", "label": "Interest Rate Volatility And Talent Migration\n(Event)", "group": "Event"}, {"id": "3200 Wilshire Blvd, Koreatown, Los Angeles", "label": "3200 Wilshire Blvd, Koreatown, Los Angeles\n(Property)", "group": "Property"}, {"id": "Morgan Stanley", "label": "Morgan Stanley\n(Organization)", "group": "Organization"}, {"id": "K-Fashion World", "label": "K-Fashion World\n(Organization)", "group": "Organization"}, {"id": "Urban Fresh Foods", "label": "Urban Fresh Foods\n(Organization)", "group": "Organization"}, {"id": "Consumer Spending Trends And Shifting Retail Behaviors", "label": "Consumer Spending Trends And Shifting Retail Behaviors\n(Event)", "group": "Event"}, {"id": "500 2Nd Avenue, Seattle", "label": "500 2Nd Avenue, Seattle\n(Property)", "group": "Property"}, {"id": "Goldman Sachs", "label": "Goldman Sachs\n(Organization)", "group": "Organization"}, {"id": "Pacific Northwest Freight Co.", "label": "Pacific Northwest Freight Co.\n(Organization)", "group": "Organization"}, {"id": "Rising Land Costs Due To Zoning Changes And Port Congestion", "label": "Rising Land Costs Due To Zoning Changes And Port Congestion\n(Event)", "group": "Event"}, {"id": "Cmbs Security Msbam 2017-C34", "label": "Cmbs Security Msbam 2017-C34\n(Inferred)", "group": "Inferred"}, {"id": "$25.3M Loan", "label": "$25.3M Loan\n(Inferred)", "group": "Inferred"}, {"id": "$30M Loan", "label": "$30M Loan\n(Inferred)", "group": "Inferred"}, {"id": "$15.7M Loan", "label": "$15.7M Loan\n(Inferred)", "group": "Inferred"}, {"id": "$42M Loan", "label": "$42M Loan\n(Inferred)", "group": "Inferred"}, {"id": "$19.5M Loan", "label": "$19.5M Loan\n(Inferred)", "group": "Inferred"}, {"id": "$23M Loan", "label": "$23M Loan\n(Inferred)", "group": "Inferred"}]);
+        
+        // Create edges
+        var edges = new vis.DataSet([{"from": "Cmbs Security Msbam 2017-C34", "to": "S&P", "label": "RATED_BY", "arrows": "to"}, {"from": "444 West Ocean Blvd, Long Beach", "to": "$25.3M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$25.3M Loan", "to": "Jpmorgan", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "444 West Ocean Blvd, Long Beach", "to": "Premier Business Centers", "label": "LEASED_TO", "arrows": "to"}, {"from": "444 West Ocean Blvd, Long Beach", "to": "Los Angeles, Ca", "label": "LOCATED_IN", "arrows": "to"}, {"from": "444 West Ocean Blvd, Long Beach", "to": "Tariffs And International Trade Risk", "label": "AFFECTED_BY", "arrows": "to"}, {"from": "888 East Ocean, Short Beach", "to": "$30M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$30M Loan", "to": "Wells Fargo", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "888 East Ocean, Short Beach", "to": "Premier Industry Centers", "label": "OCCUPIED_BY", "arrows": "to"}, {"from": "888 East Ocean, Short Beach", "to": "San Francisco, Ca", "label": "LOCATED_IN", "arrows": "to"}, {"from": "101 Market Street, Oakland", "to": "$15.7M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$15.7M Loan", "to": "Citibank", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "101 Market Street, Oakland", "to": "Bluewave Financial Group", "label": "LEASED_TO", "arrows": "to"}, {"from": "101 Market Street, Oakland", "to": "Flexstart Co-Working", "label": "LEASED_TO", "arrows": "to"}, {"from": "101 Market Street, Oakland", "to": "Local Regulatory Shifts And Commercial Zoning Reform", "label": "AFFECTED_BY", "arrows": "to"}, {"from": "707 Mission Street, San Jose", "to": "$42M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$42M Loan", "to": "Bank Of America", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "707 Mission Street, San Jose", "to": "Innovatex Labs", "label": "LEASED_TO", "arrows": "to"}, {"from": "707 Mission Street, San Jose", "to": "Bitcore Systems", "label": "LEASED_TO", "arrows": "to"}, {"from": "707 Mission Street, San Jose", "to": "Interest Rate Volatility And Talent Migration", "label": "EXPOSED_TO", "arrows": "to"}, {"from": "3200 Wilshire Blvd, Koreatown, Los Angeles", "to": "$19.5M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$19.5M Loan", "to": "Morgan Stanley", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "3200 Wilshire Blvd, Koreatown, Los Angeles", "to": "K-Fashion World", "label": "LEASED_TO", "arrows": "to"}, {"from": "3200 Wilshire Blvd, Koreatown, Los Angeles", "to": "Urban Fresh Foods", "label": "LEASED_TO", "arrows": "to"}, {"from": "3200 Wilshire Blvd, Koreatown, Los Angeles", "to": "Consumer Spending Trends And Shifting Retail Behaviors", "label": "EXPOSED_TO", "arrows": "to"}, {"from": "500 2Nd Avenue, Seattle", "to": "$23M Loan", "label": "SECURED_BY", "arrows": "to"}, {"from": "$23M Loan", "to": "Goldman Sachs", "label": "ORIGINATED_BY", "arrows": "to"}, {"from": "500 2Nd Avenue, Seattle", "to": "Pacific Northwest Freight Co.", "label": "OCCUPIED_BY", "arrows": "to"}, {"from": "500 2Nd Avenue, Seattle", "to": "Rising Land Costs Due To Zoning Changes And Port Congestion", "label": "AFFECTED_BY", "arrows": "to"}]);
+        
+        // Create network
+        var container = document.getElementById('network');
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+        var options = {
+            nodes: {
+                shape: 'dot',
+                size: 16,
+                font: {
+                    size: 12,
+                    face: 'arial'
+                }
+            },
+            edges: {
+                width: 2,
+                color: { color: '#000000', highlight: '#000000' },  // Black edges
+                font: {
+                    size: 14,  // Larger labels for relationships
+                    align: 'middle',
+                    strokeWidth: 0,  // No background
+                    color: '#000000'  // Black labels
+                },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.7 }
+                },
+                smooth: { enabled: true, type: 'dynamic' }
+            },
+            physics: {
+                forceAtlas2Based: {
+                    gravitationalConstant: -50,
+                    centralGravity: 0.01,
+                    springLength: 150,
+                    springConstant: 0.08
+                },
+                maxVelocity: 50,
+                solver: 'forceAtlas2Based',
+                timestep: 0.35,
+                stabilization: { iterations: 200 }
+            },
+            layout: {
+                improvedLayout: true
+            }
+        };
+        var network = new vis.Network(container, data, options);
+        
+        // Log for debugging
+        console.log('Nodes:', nodes.get());
+        console.log('Edges:', edges.get());
+    </script>
+</body>
+</html>

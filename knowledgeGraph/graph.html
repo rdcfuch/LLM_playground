@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge Graph Visualization from Cypher</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; }
+    svg { width: 100%; height: 100vh; }
+    .node circle { stroke: #fff; stroke-width: 1.5px; }
+    .node text { pointer-events: none; font-size: 10px; fill: #333; text-anchor: start; dominant-baseline: middle; }
+    .link { fill: none; stroke: #999; stroke-opacity: 0.6; }
+    .link-text { font-size: 8px; fill: #555; text-anchor: middle; dominant-baseline: central; }
+  </style>
+</head>
+<body>
+  <svg></svg>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const nodesData = [
+  {
+    "id": "Cmbs Security Msbam 2017-C34",
+    "group": "Financial instrument"
+  },
+  {
+    "id": "S&P",
+    "group": "Organization"
+  },
+  {
+    "id": "444 West Ocean Blvd, Long Beach",
+    "group": "Property"
+  },
+  {
+    "id": "Jpmorgan",
+    "group": "Organization"
+  },
+  {
+    "id": "Premier Business Centers",
+    "group": "Organization"
+  },
+  {
+    "id": "Los Angeles, Ca",
+    "group": "Location"
+  },
+  {
+    "id": "Tariffs And International Trade Risk",
+    "group": "Event"
+  },
+  {
+    "id": "888 East Ocean, Short Beach",
+    "group": "Property"
+  },
+  {
+    "id": "Wells Fargo",
+    "group": "Organization"
+  },
+  {
+    "id": "Premier Industry Centers",
+    "group": "Organization"
+  },
+  {
+    "id": "San Francisco, Ca",
+    "group": "Location"
+  },
+  {
+    "id": "101 Market Street, Oakland",
+    "group": "Property"
+  },
+  {
+    "id": "Citibank",
+    "group": "Organization"
+  },
+  {
+    "id": "Bluewave Financial Group",
+    "group": "Organization"
+  },
+  {
+    "id": "Flexstart Co-Working",
+    "group": "Organization"
+  },
+  {
+    "id": "Local Regulatory Shifts And Commercial Zoning Reform",
+    "group": "Event"
+  },
+  {
+    "id": "707 Mission Street, San Jose",
+    "group": "Property"
+  },
+  {
+    "id": "Bank Of America",
+    "group": "Organization"
+  },
+  {
+    "id": "Innovatex Labs",
+    "group": "Organization"
+  },
+  {
+    "id": "Bitcore Systems",
+    "group": "Organization"
+  },
+  {
+    "id": "Interest Rate Volatility And Talent Migration",
+    "group": "Event"
+  },
+  {
+    "id": "3200 Wilshire Blvd, Koreatown, Los Angeles",
+    "group": "Property"
+  },
+  {
+    "id": "Morgan Stanley",
+    "group": "Organization"
+  },
+  {
+    "id": "K-Fashion World",
+    "group": "Organization"
+  },
+  {
+    "id": "Urban Fresh Foods",
+    "group": "Organization"
+  },
+  {
+    "id": "Consumer Spending Trends And Shifting Retail Behaviors",
+    "group": "Event"
+  },
+  {
+    "id": "500 2Nd Avenue, Seattle",
+    "group": "Property"
+  },
+  {
+    "id": "Goldman Sachs",
+    "group": "Organization"
+  },
+  {
+    "id": "Pacific Northwest Freight Co.",
+    "group": "Organization"
+  },
+  {
+    "id": "Rising Land Costs Due To Zoning Changes And Port Congestion",
+    "group": "Event"
+  }
+];
+    const linksData = [
+  {
+    "source": "Cmbs Security Msbam 2017-C34",
+    "target": "S&P",
+    "type": "RATED_BY"
+  },
+  {
+    "source": "444 West Ocean Blvd, Long Beach",
+    "target": "$25.3M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$25.3M Loan",
+    "target": "Jpmorgan",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "444 West Ocean Blvd, Long Beach",
+    "target": "Premier Business Centers",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "444 West Ocean Blvd, Long Beach",
+    "target": "Los Angeles, Ca",
+    "type": "LOCATED_IN"
+  },
+  {
+    "source": "444 West Ocean Blvd, Long Beach",
+    "target": "Tariffs And International Trade Risk",
+    "type": "AFFECTED_BY"
+  },
+  {
+    "source": "888 East Ocean, Short Beach",
+    "target": "$30M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$30M Loan",
+    "target": "Wells Fargo",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "888 East Ocean, Short Beach",
+    "target": "Premier Industry Centers",
+    "type": "OCCUPIED_BY"
+  },
+  {
+    "source": "888 East Ocean, Short Beach",
+    "target": "San Francisco, Ca",
+    "type": "LOCATED_IN"
+  },
+  {
+    "source": "101 Market Street, Oakland",
+    "target": "$15.7M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$15.7M Loan",
+    "target": "Citibank",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "101 Market Street, Oakland",
+    "target": "Bluewave Financial Group",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "101 Market Street, Oakland",
+    "target": "Flexstart Co-Working",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "101 Market Street, Oakland",
+    "target": "Local Regulatory Shifts And Commercial Zoning Reform",
+    "type": "AFFECTED_BY"
+  },
+  {
+    "source": "707 Mission Street, San Jose",
+    "target": "$42M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$42M Loan",
+    "target": "Bank Of America",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "707 Mission Street, San Jose",
+    "target": "Innovatex Labs",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "707 Mission Street, San Jose",
+    "target": "Bitcore Systems",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "707 Mission Street, San Jose",
+    "target": "Interest Rate Volatility And Talent Migration",
+    "type": "EXPOSED_TO"
+  },
+  {
+    "source": "3200 Wilshire Blvd, Koreatown, Los Angeles",
+    "target": "$19.5M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$19.5M Loan",
+    "target": "Morgan Stanley",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "3200 Wilshire Blvd, Koreatown, Los Angeles",
+    "target": "K-Fashion World",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "3200 Wilshire Blvd, Koreatown, Los Angeles",
+    "target": "Urban Fresh Foods",
+    "type": "LEASED_TO"
+  },
+  {
+    "source": "3200 Wilshire Blvd, Koreatown, Los Angeles",
+    "target": "Consumer Spending Trends And Shifting Retail Behaviors",
+    "type": "EXPOSED_TO"
+  },
+  {
+    "source": "500 2Nd Avenue, Seattle",
+    "target": "$23M Loan",
+    "type": "SECURED_BY"
+  },
+  {
+    "source": "$23M Loan",
+    "target": "Goldman Sachs",
+    "type": "ORIGINATED_BY"
+  },
+  {
+    "source": "500 2Nd Avenue, Seattle",
+    "target": "Pacific Northwest Freight Co.",
+    "type": "OCCUPIED_BY"
+  },
+  {
+    "source": "500 2Nd Avenue, Seattle",
+    "target": "Rising Land Costs Due To Zoning Changes And Port Congestion",
+    "type": "AFFECTED_BY"
+  }
+];
+
+    const svg = d3.select("svg"),
+          viewWidth = window.innerWidth,
+          viewHeight = window.innerHeight;
+
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    const simulation = d3.forceSimulation(nodesData)
+      .force("link", d3.forceLink(linksData).id(d => d.id).distance(150))
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(viewWidth / 2, viewHeight / 2))
+      .force("collide", d3.forceCollide().radius(d => 20)); // Add collision force
+
+    // Arrowhead marker definition
+    svg.append('defs').append('marker')
+        .attr('id', 'arrowhead')
+        .attr('viewBox', '-0 -5 10 10')
+        .attr('refX', 19) // Adjusts how far the arrow sits from the node
+        .attr('refY', 0)
+        .attr('orient', 'auto')
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('xoverflow', 'visible')
+      .append('svg:path')
+        .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+        .attr('fill', '#999')
+        .style('stroke', 'none');
+
+    const link = svg.append("g")
+      .attr("class", "links")
+      .selectAll("line")
+      .data(linksData)
+      .join("line")
+      .attr("class", "link")
+      .attr("stroke-width", 1.5)
+      .attr('marker-end', 'url(#arrowhead)');
+
+    const linkText = svg.append("g")
+      .attr("class", "link-texts")
+      .selectAll("text")
+      .data(linksData)
+      .join("text")
+      .attr("class", "link-text")
+      .text(d => d.type);
+
+    const node = svg.append("g")
+      .attr("class", "nodes")
+      .selectAll("g")
+      .data(nodesData)
+      .join("g")
+      .attr("class", "node")
+      .call(drag(simulation));
+
+    node.append("circle")
+      .attr("r", 10)
+      .attr("fill", d => color(d.group));
+
+    node.append("text")
+      .text(d => d.id)
+      .attr("x", 15)
+      .attr("y", 0);
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("transform", d => `translate(${d.x},${d.y})`);
+
+      linkText
+        .attr("x", d => (d.source.x + d.target.x) / 2)
+        .attr("y", d => (d.source.y + d.target.y) / 2);
+    });
+
+    function drag(simulation) {
+      function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      }
+
+      function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+      }
+
+      function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        // Keep fx and fy to make nodes stay after drag
+        // d.fx = null; 
+        // d.fy = null;
+      }
+
+      return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
+    }
+
+    // Optional: Resize handler
+    window.addEventListener('resize', () => {
+        svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        simulation.force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2)).restart();
+    });
+  </script>
+</body>
+</html>

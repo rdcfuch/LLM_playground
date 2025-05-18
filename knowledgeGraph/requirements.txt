@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+langchain-core
+langchain-openai
+langchain-experimental
+python-dotenv
+# Add other dependencies from kg_test.py if they are not covered by the above
+# networkx # Not directly used by the server, but was in kg_test.py for direct visualization
+# matplotlib # Not directly used by the server, but was in kg_test.py for direct visualization
