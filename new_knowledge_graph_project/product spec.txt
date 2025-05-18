@@ -1,0 +1,142 @@
+Comprehensive Product Specification for Knowledge Graph System (Updated)
+This specification outlines a knowledge graph system designed to meet your needs for importing data from Excel and documents, generating and visualizing knowledge graphs based on user-defined schemas, and managing them with editing and updating capabilities. The system now explicitly supports JSON-LD as a schema format and includes a local Neo4j server as a deployment option. It adopts a product manager’s perspective, focusing on user needs, features, and technical considerations, informed by industry practices and platforms like Stardog, Neo4j, and Ontotext.
+
+Product Vision
+
+The knowledge graph system empowers users to transform raw data from Excel and documents into a structured, interconnected knowledge graph. By enabling custom schema definitions (including JSON-LD), interactive visualizations, and robust management tools, it serves as a centralized platform for data analysts, researchers, and teams to explore, query, and update complex data relationships. The system supports deployment on a local Neo4j server, ensuring flexibility for users requiring on-premises solutions. It fosters collaboration and integrates with other tools, making it a versatile solution for knowledge management.
+
+Key Features
+
+The system includes the following features, updated to incorporate JSON-LD and local Neo4j server support:
+
+Data Import and Transformation
+Supported Formats: Excel (.xlsx, .csv), JSON, JSON-LD, XML, and PDFs, with potential support for other formats like Word or text files pending clarification.
+Mapping Tools: Semi-automatic or manual mapping of imported data to the user-defined schema (including JSON-LD), ensuring data integrity.
+Validation: Checks for data consistency and completeness during import, with specific support for parsing JSON-LD structures.
+Schema Definition and Management
+User Interface: A visual or text-based interface for defining entities and relationships, supporting JSON-LD, OWL, and RDFS.
+Standards Support: Compatibility with JSON-LD for web-friendly schemas, OWL for formal ontologies, and RDFS for basic semantics, as seen in platforms like GNOSS.
+Reusability: Option to reuse existing schemas or templates (e.g., schema.org for JSON-LD).
+Knowledge Graph Generation
+Automation: Automatically generates the knowledge graph by mapping imported data to the schema, including JSON-LD data.
+Integration: Unifies data from multiple sources (including JSON-LD) into a single graph, addressing data silos, as highlighted by Ontotext.
+Visualization
+Interactive Display: Renders the knowledge graph with nodes and edges, using libraries like D3.js or Cytoscape.js, compatible with JSON-LD-based graphs.
+Navigation: Zoom, pan, and filter options for exploring large graphs.
+Customization: Adjust node/edge colors, labels, and layouts.
+Export: Save visualizations as images or interactive web pages, with JSON-LD export options for web integration.
+Query and Retrieval
+Query Options: SPARQL for advanced users, natural language querying for accessibility, and Cypher for Neo4j-based queries, inspired by Stardog Voicebox and Neo4j.
+Search: Find specific entities, relationships, or subgraphs.
+Output Formats: Present results in tables, graphs, JSON, or JSON-LD.
+Editing and Collaboration
+Graph Editing: Add, update, or delete nodes and edges via a user interface, supporting JSON-LD and Neo4j data models.
+Version Control: Track changes with rollback capabilities.
+Collaboration: Role-based permissions (admin, editor, viewer) for team access.
+Sharing: Export or share graphs (including in JSON-LD format) with external users.
+Knowledge Graph Updates
+Incremental Updates: Merge new data from uploads (including JSON-LD) into the existing graph, as seen in Stardog’s import process.
+Conflict Resolution: Detect and resolve duplicates or conflicts automatically or with user input.
+Synchronization: Support periodic updates from external sources, including JSON-LD data.
+Integration and APIs
+RESTful APIs: Endpoints for data import, querying, and updates, with JSON-LD support for web compatibility.
+Federated Queries: Query across multiple graphs or external sources, as in Amazon Neptune and Neo4j.
+Connectors: Pre-built integrations for databases, cloud storage, or CRMs, including Neo4j connectors.
+Scalability and Performance
+Large Datasets: Handle up to 1 billion triples, inspired by Stardog’s scalability and Neo4j’s performance.
+Optimization: Indexing and caching for fast queries, optimized for local Neo4j server deployments.
+Deployment Options: Support for cloud (AWS, Azure, Google Cloud) and local Neo4j server for on-premises use.
+Security and Compliance
+Access Control: Role-based access control (RBAC) for both cloud and local Neo4j deployments.
+Encryption: Data encrypted at rest and in transit, including on local Neo4j servers.
+Auditing: Log changes and access for compliance (e.g., GDPR, HIPAA).
+User Stories
+
+Data Analyst: “I want to import my Excel and JSON-LD files to create a knowledge graph for analysis.”
+Domain Expert: “I need to define a schema in JSON-LD that reflects my data’s structure for web integration.”
+Researcher: “I want to visualize the graph on a local Neo4j server to uncover hidden relationships.”
+Developer: “I need Cypher and SPARQL queries to extract data from a Neo4j-based graph for my app.”
+Team Leader: “I want my team to collaborate securely on the graph, hosted on our local Neo4j server.”
+User: “I need to update the graph with new JSON-LD data without losing existing information.”
+Technical Requirements
+
+Data Model: RDF for representing the knowledge graph, with JSON-LD as a serialization format, ensuring interoperability (W3C Standards).
+Storage: Graph database, with Neo4j as the primary option for both cloud and local server deployments.
+Query Language: SPARQL for RDF/JSON-LD data, Cypher for Neo4j-specific queries, and optional NLP for natural language queries.
+Visualization: D3.js, Cytoscape.js, or Neo4j Bloom for rendering graphs.
+Data Import: Tools for parsing Excel, CSV, JSON, JSON-LD, XML, and PDFs.
+APIs: RESTful APIs for all major functions, with JSON-LD output support.
+Versioning: System to track and revert changes, compatible with Neo4j.
+Scalability: Horizontal scaling via Kubernetes for cloud or optimized local Neo4j server configurations.
+Non-Functional Requirements
+
+Performance: Sub-2-second query responses for typical use cases; sub-second for simple queries on local Neo4j servers.
+Scalability: Support 1 billion triples with minimal degradation, optimized for Neo4j.
+Usability: Intuitive interface with documentation and tutorials, including Neo4j setup guides.
+Security: RBAC, encryption, and compliance with GDPR/HIPAA for local and cloud deployments.
+Reliability: 99.9% uptime with automated backups, including for local Neo4j servers.
+Extensibility: Modular design for adding new features or integrations, such as JSON-LD extensions.
+Architecture Overview
+
+Frontend: Web interface (React/Angular) for schema definition (including JSON-LD), visualization, and querying.
+Backend: REST API server for data processing and graph management, with Neo4j integration.
+Database: Neo4j graph database for storing RDF and JSON-LD data, deployable on a local server.
+Data Pipeline: ETL processes for importing and transforming data, including JSON-LD parsing.
+Caching: Redis or similar for query performance, compatible with local Neo4j setups.
+Authentication: OAuth/LDAP for secure access, including for local deployments.
+
+Example Schema Definition:
+"""
+{
+  "@context": "http://schema.org",
+  "@graph": [
+    {
+      "@id": "http://example.com/ontology#Employee",
+      "@type": "rdfs:Class",
+      "rdfs:label": "Employee"
+    },
+    {
+      "@id": "http://example.com/ontology#Project",
+      "@type": "rdfs:Class",
+      "rdfs:label": "Project"
+    },
+    {
+      "@id": "http://example.com/ontology#worksOn",
+      "@type": "rdf:Property",
+      "rdfs:domain": { "@id": "http://example.com/ontology#Employee" },
+      "rdfs:range": { "@id": "http://example.com/ontology#Project" },
+      "rdfs:label": "works on"
+    },
+    {
+      "@id": "http://example.com/ontology#name",
+      "@type": "rdf:Property",
+      "rdfs:domain": { "@id": "http://example.com/ontology#Employee" },
+      "rdfs:range": { "@id": "xsd:string" },
+      "rdfs:label": "name"
+    },
+    {
+      "@id": "http://example.com/ontology#projectID",
+      "@type": "rdf:Property",
+      "rdfs:domain": { "@id": "http://example.com/ontology#Project" },
+      "rdfs:range": { "@id": "xsd:string" },
+      "rdfs:label": "project ID"
+    }
+  ]
+}
+
+"""
+
+Below is an updated example of a schema for a knowledge graph, now expressed in JSON-LD to align with the new requirement, maintaining the same artifact_id as the original example for consistency.
+
+Employee-Project Ontology
+ld+json
+Show inline
+This JSON-LD schema defines two classes (Employee, Project), a relationship (worksOn), and properties (name, projectID), compatible with Neo4j storage and web integration. Users can create similar schemas via a visual interface or text editor in the system.
+
+Implementation Considerations
+
+JSON-LD Support: JSON-LD’s web compatibility, as noted in Schema App Solutions, makes it ideal for web-facing applications and schema.org integration. The system will include parsers for JSON-LD to map data to the graph.
+Local Neo4j Server: Neo4j supports RDF and JSON-LD data through plugins like n10s, enabling local deployment for on-premises use. The system will include setup guides for local Neo4j instances, as seen in Neo4j Knowledge Graph Use Cases.
+Document Formats: The system assumes JSON, JSON-LD, XML, and PDFs for “documents,” but Word or text files may require additional parsing tools.
+Scalability: Neo4j handles large graphs efficiently, with local server deployments optimized for performance, as per Neo4j’s documentation.
+Visualization: Neo4j Bloom can enhance visualization for local deployments, complementing D3.js or Cytosc��타기
