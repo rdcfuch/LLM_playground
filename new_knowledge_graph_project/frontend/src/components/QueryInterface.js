@@ -4,7 +4,7 @@ import { NEO4J_CONFIG } from '../config';
 
 const QueryInterface = () => {
   const [queryType, setQueryType] = useState('cypher');
-  const [queryText, setQueryText] = useState('');
+  const [queryText, setQueryText] = useState('MATCH (n) RETURN n LIMIT 100');  // Set default query
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -32,6 +32,17 @@ const QueryInterface = () => {
       });
     }
   }, []);
+
+  // Update default query when query type changes
+  useEffect(() => {
+    if (!queryText || queryText === 'MATCH (n) RETURN n LIMIT 100' || queryText === 'SELECT ?subject ?predicate ?object WHERE { ?subject ?predicate ?object } LIMIT 10') {
+      if (queryType === 'cypher') {
+        setQueryText('MATCH (n) RETURN n LIMIT 100');
+      } else {
+        setQueryText('SELECT ?subject ?predicate ?object WHERE { ?subject ?predicate ?object } LIMIT 10');
+      }
+    }
+  }, [queryType]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -147,7 +158,7 @@ const QueryInterface = () => {
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             placeholder={queryType === 'cypher' ? 
-              'MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 10' : 
+              'MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 25' : 
               'SELECT ?subject ?predicate ?object WHERE { ?subject ?predicate ?object } LIMIT 10'
             }
             required

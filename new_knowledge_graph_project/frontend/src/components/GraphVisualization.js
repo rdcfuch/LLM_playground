@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, Form, Button, ButtonGroup, Row, Col, Alert, Spinner } from 'react-bootstrap';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { NEO4J_CONFIG } from '../config';
 
 const GraphVisualization = () => {
   const svgRef = useRef(null);
@@ -13,6 +14,30 @@ const GraphVisualization = () => {
   const [selectedNodeType, setSelectedNodeType] = useState('All');
   const [relationshipTypes, setRelationshipTypes] = useState([]);
   const [selectedRelationship, setSelectedRelationship] = useState('All');
+  const [neo4jCredentials, setNeo4jCredentials] = useState({
+    username: '',
+    password: ''
+  });
+  const [showCredentials, setShowCredentials] = useState(false);
+  
+  // Load credentials from localStorage if available or from config
+  useEffect(() => {
+    const storedUsername = localStorage.getItem('neo4j_username');
+    const storedPassword = localStorage.getItem('neo4j_password');
+    
+    if (storedUsername && storedPassword) {
+      setNeo4jCredentials({
+        username: storedUsername,
+        password: storedPassword
+      });
+    } else if (NEO4J_CONFIG && NEO4J_CONFIG.user) {
+      // Use credentials from config if available
+      setNeo4jCredentials({
+        username: NEO4J_CONFIG.user,
+        password: NEO4J_CONFIG.password || '' // Handle case where password might not be in config
+      });
+    }
+  }, []);
   
   useEffect(() => {
     fetchGraphData();
@@ -74,6 +99,235 @@ const GraphVisualization = () => {
     }
   };
   
+  const fetchFullNeo4jGraph = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Save credentials to localStorage
+      localStorage.setItem('neo4j_username', neo4jCredentials.username);
+      localStorage.setItem('neo4j_password', neo4jCredentials.password);
+      
+      // First, fetch all nodes
+      const nodesResponse = await fetch('http://localhost:5001/api/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'cypher',
+          query: 'MATCH (n) RETURN n LIMIT 1000',
+          auth: {
+            username: neo4jCredentials.username,
+            password: neo4jCredentials.password
+          }
+        }),
+      });
+      
+      const nodesData = await nodesResponse.json();
+      
+      if (nodesData.status === 'error') {
+        setError(nodesData.message);
+        setLoading(false);
+        return;
+      }
+      
+      // Then, fetch all relationships
+      const relsResponse = await fetch('http://localhost:5001/api/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'cypher',
+          query: 'MATCH ()-[r]->() RETURN r, startNode(r) as source, endNode(r) as target LIMIT 1000',
+          auth: {
+            username: neo4jCredentials.username,
+            password: neo4jCredentials.password
+          }
+        }),
+      });
+      
+      const relsData = await relsResponse.json();
+      
+      if (relsData.status === 'error') {
+        setError(relsData.message);
+        setLoading(false);
+        return;
+      }
+      
+      // Process nodes
+      const nodes = [];
+      const nodeMap = new Map();
+      let idCounter = 1;
+      
+      if (Array.isArray(nodesData.results)) {
+        nodesData.results.forEach(record => {
+          if (!record || !record.n) {
+            return; // Skip incomplete records
+          }
+          
+          const node = record.n;
+          const nodeKey = JSON.stringify(node);
+          
+          if (!nodeMap.has(nodeKey)) {
+            // Handle different label formats (_labels vs labels)
+            const labels = node._labels || node.labels || [];
+            
+            const nodeData = {
+              id: idCounter++,
+              label: Array.isArray(labels) && labels.length > 0 ? labels[0] : 'Unknown',
+              properties: {}
+            };
+            
+            // Extract properties
+            Object.keys(node).forEach(key => {
+              if (key !== '_labels' && key !== 'labels') {
+                nodeData.properties[key] = node[key];
+              }
+            });
+            
+            // Make sure to include _labels in properties for display
+            if (node._labels) {
+              nodeData.properties._labels = node._labels;
+            }
+            
+            nodes.push(nodeData);
+            nodeMap.set(nodeKey, nodeData);
+          }
+        });
+      }
+      
+      // Process relationships
+      const links = [];
+      const relationshipTypes = new Set();
+      
+      if (Array.isArray(relsData.results)) {
+        relsData.results.forEach(record => {
+          if (!record || !record.r || !record.source || !record.target) {
+            return; // Skip incomplete records
+          }
+          
+          const rel = record.r;
+          const source = record.source;
+          const target = record.target;
+          
+          // Find source and target nodes in our node map
+          const sourceKey = JSON.stringify(source);
+          const targetKey = JSON.stringify(target);
+          
+          const sourceNode = nodeMap.get(sourceKey);
+          const targetNode = nodeMap.get(targetKey);
+          
+          if (sourceNode && targetNode) {
+            const relType = rel.type || 'RELATED_TO';
+            relationshipTypes.add(relType);
+            
+            links.push({
+              source: sourceNode.id,
+              target: targetNode.id,
+              type: relType,
+              properties: {}
+            });
+            
+            // Extract relationship properties
+            Object.keys(rel).forEach(key => {
+              if (key !== 'type') {
+                links[links.length - 1].properties[key] = rel[key];
+              }
+            });
+          }
+        });
+      }
+      
+      // If no relationships were found, try a different approach
+      if (links.length === 0) {
+        console.log("No relationships found with first query, trying alternative...");
+        
+        const altRelsResponse = await fetch('http://localhost:5001/api/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'cypher',
+            query: 'MATCH (a)-[r]->(b) RETURN a, r, b LIMIT 1000',
+            auth: {
+              username: neo4jCredentials.username,
+              password: neo4jCredentials.password
+            }
+          }),
+        });
+        
+        const altRelsData = await altRelsResponse.json();
+        
+        if (altRelsData.status !== 'error' && Array.isArray(altRelsData.results)) {
+          altRelsData.results.forEach(record => {
+            if (!record || !record.a || !record.r || !record.b) {
+              return; // Skip incomplete records
+            }
+            
+            const source = record.a;
+            const rel = record.r;
+            const target = record.b;
+            
+            // Find source and target nodes in our node map
+            const sourceKey = JSON.stringify(source);
+            const targetKey = JSON.stringify(target);
+            
+            const sourceNode = nodeMap.get(sourceKey);
+            const targetNode = nodeMap.get(targetKey);
+            
+            if (sourceNode && targetNode) {
+              const relType = rel.type || 'RELATED_TO';
+              relationshipTypes.add(relType);
+              
+              links.push({
+                source: sourceNode.id,
+                target: targetNode.id,
+                type: relType,
+                properties: {}
+              });
+              
+              // Extract relationship properties
+              Object.keys(rel).forEach(key => {
+                if (key !== 'type') {
+                  links[links.length - 1].properties[key] = rel[key];
+                }
+              });
+            }
+          });
+        }
+      }
+      
+      // Update the graph state with the new data
+      const graphData = { nodes, links };
+      setGraph(graphData);
+      
+      // Extract unique node types for filtering
+      const types = [...new Set(nodes.map(node => node.label))];
+      setNodeTypes(types);
+      setRelationshipTypes([...relationshipTypes]);
+      
+      console.log('Processed nodes:', nodes.length);
+      console.log('Processed relationships:', links.length);
+      
+    } catch (err) {
+      console.error('Error details:', err);
+      setError('Failed to fetch Neo4j graph: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Check if credentials are available either from local state or config
+  const hasCredentials = () => {
+    return (
+      (neo4jCredentials.username && neo4jCredentials.password) || 
+      (NEO4J_CONFIG && NEO4J_CONFIG.user)
+    );
+  };
+  
   const renderGraph = () => {
     // Clear previous visualization
     d3.select(svgRef.current).selectAll("*").remove();
@@ -119,20 +373,19 @@ const GraphVisualization = () => {
       );
     }
     
-    // Create a color scale for node types
+    // Create a color scale for node types (using d3.schemeCategory10 like in test1.html)
     const color = d3.scaleOrdinal(d3.schemeCategory10)
       .domain(nodeTypes);
     
-    // Create the simulation
+    // Create the simulation with similar parameters to test1.html
     const simulation = d3.forceSimulation(filteredNodes)
       .force("link", d3.forceLink(filteredLinks)
         .id(d => d.id)
-        .distance(150))
+        .distance(100))
       .force("charge", d3.forceManyBody().strength(-300))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide().radius(50));
+      .force("center", d3.forceCenter(width / 2, height / 2));
     
-    // Create links
+    // Create links with styling similar to test1.html
     const link = svg.append("g")
       .attr("class", "links")
       .selectAll("line")
@@ -142,7 +395,7 @@ const GraphVisualization = () => {
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", 1.5);
     
-    // Create link labels
+    // Create link labels (relationship types)
     const linkText = svg.append("g")
       .attr("class", "link-labels")
       .selectAll("text")
@@ -160,10 +413,12 @@ const GraphVisualization = () => {
       .data(filteredNodes)
       .enter().append("g");
     
-    // Add circles to nodes
+    // Add circles to nodes with styling similar to test1.html
     node.append("circle")
       .attr("r", 10)
       .attr("fill", d => color(d.label))
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.5)
       .call(d3.drag()
         .on("start", dragstarted)
         .on("drag", dragged)
@@ -171,17 +426,40 @@ const GraphVisualization = () => {
     
     // Add labels to nodes
     node.append("text")
-      .text(d => d.properties.name || d.label)
+      .text(d => {
+        // First try to get the name property
+        if (d.properties.name) {
+          return d.properties.name;
+        }
+        
+        // If no name, show the first label from _labels if available
+        if (d.properties._labels && Array.isArray(d.properties._labels) && d.properties._labels.length > 0) {
+          return d.properties._labels[0];
+        }
+        
+        // Fallback to the node label
+        return d.label;
+      })
       .attr("x", 15)
       .attr("y", 5)
-      .attr("font-size", 12);
+      .attr("font-size", 12)
+      .attr("pointer-events", "none"); // Make text non-interactive like in test1.html
     
     // Add tooltips
     node.append("title")
       .text(d => {
         let tooltip = `Type: ${d.label}\n`;
+        
+        // Add _labels information if available
+        if (d.properties._labels && Array.isArray(d.properties._labels)) {
+          tooltip += `Labels: ${d.properties._labels.join(', ')}\n`;
+        }
+        
+        // Add all other properties
         for (const [key, value] of Object.entries(d.properties)) {
-          tooltip += `${key}: ${value}\n`;
+          if (key !== '_labels') {
+            tooltip += `${key}: ${value}\n`;
+          }
         }
         return tooltip;
       });
@@ -202,7 +480,7 @@ const GraphVisualization = () => {
         .attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
-    // Drag functions
+    // Drag functions (same as in test1.html)
     function dragstarted(event, d) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
@@ -318,17 +596,65 @@ const GraphVisualization = () => {
             </Col>
           </Row>
           
-          <ButtonGroup className="mb-3">
-            <Button variant="outline-primary" onClick={() => fetchGraphData()}>
-              Refresh
-            </Button>
-            <Button variant="outline-secondary" onClick={() => handleExport('svg')}>
-              Export SVG
-            </Button>
-            <Button variant="outline-secondary" onClick={() => handleExport('png')}>
-              Export PNG
-            </Button>
-          </ButtonGroup>
+          <Row className="mb-3">
+            <Col>
+              <Button 
+                variant="outline-secondary" 
+                className="me-2"
+                onClick={() => setShowCredentials(!showCredentials)}
+              >
+                {showCredentials ? 'Hide Neo4j Credentials' : 'Configure Neo4j Credentials'}
+              </Button>
+              
+              <Button 
+                variant="primary" 
+                className="me-2"
+                onClick={fetchFullNeo4jGraph}
+                disabled={!hasCredentials()}
+              >
+                Show Full Neo4j Graph
+              </Button>
+              
+              <ButtonGroup className="me-2">
+                <Button variant="outline-primary" onClick={() => fetchGraphData()}>
+                  Refresh
+                </Button>
+                <Button variant="outline-secondary" onClick={() => handleExport('svg')}>
+                  Export SVG
+                </Button>
+                <Button variant="outline-secondary" onClick={() => handleExport('png')}>
+                  Export PNG
+                </Button>
+              </ButtonGroup>
+            </Col>
+          </Row>
+          
+          {showCredentials && (
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Neo4j Username</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={neo4jCredentials.username}
+                    onChange={(e) => setNeo4jCredentials({...neo4jCredentials, username: e.target.value})}
+                    placeholder="neo4j"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Neo4j Password</Form.Label>
+                  <Form.Control
+                    type="password"
+                    value={neo4jCredentials.password}
+                    onChange={(e) => setNeo4jCredentials({...neo4jCredentials, password: e.target.value})}
+                    placeholder="Enter your Neo4j password"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          )}
         </Card.Body>
       </Card>
       
@@ -342,12 +668,9 @@ const GraphVisualization = () => {
               <p className="mt-3">Loading graph data...</p>
             </div>
           ) : (
-            <svg 
-              ref={svgRef} 
-              width="100%" 
-              height="600px" 
-              style={{ border: '1px solid #ddd', borderRadius: '4px' }}
-            />
+            <div className="graph-container" style={{ height: '600px', border: '1px solid #ddd' }}>
+              <svg ref={svgRef} width="100%" height="100%"></svg>
+            </div>
           )}
         </Card.Body>
       </Card>
