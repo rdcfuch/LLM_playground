@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Modal, Alert } from 'react-bootstrap';
+import { NEO4J_CONFIG } from '../config';
 
 const ApiKeyConfig = ({ show, onHide, onSave }) => {
   const [apiKey, setApiKey] = useState('');
@@ -45,7 +46,7 @@ const ApiKeyConfig = ({ show, onHide, onSave }) => {
   return (
     <Modal show={show} onHide={onHide}>
       <Modal.Header closeButton>
-        <Modal.Title>OpenAI API Key Configuration</Modal.Title>
+        <Modal.Title>API Configuration</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {error && (
@@ -64,6 +65,14 @@ const ApiKeyConfig = ({ show, onHide, onSave }) => {
           Enter your OpenAI API key to enable LLM-powered features like unstructured data parsing.
           Your API key is stored locally in your browser and is never sent to our servers.
         </p>
+        
+        <div className="mb-3">
+          <h6>Neo4j Connection Information</h6>
+          <p className="text-muted">
+            The application is configured to connect to Neo4j at:
+            <code>{NEO4J_CONFIG.uri}</code> with user <code>{NEO4J_CONFIG.user}</code>
+          </p>
+        </div>
         
         <Form.Group className="mb-3">
           <Form.Label>OpenAI API Key</Form.Label>

@@ -4,15 +4,12 @@ import json
 import os
 
 # Import modules
-from data_import import DataImporter  # Change to import the class directly
+from data_import import DataImporter
 from schema_manager import SchemaManager
 from llm_parser import LLMParser
 from neo4j import GraphDatabase
-# Change this line:
-from neo4j_connector import Neo4jConnector  # Fix this import
-
-# To this:
 from neo4j_connector import Neo4jConnector
+from config import NEO4J_CONFIG  # Import the configuration
 import pandas as pd
 import PyPDF2
 import rdflib
@@ -34,10 +31,10 @@ class Neo4jConnection:
             result = session.run(query, parameters)
             return [record for record in result]
 
-# Initialize Neo4j connection
-neo4j_uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-neo4j_user = os.environ.get("NEO4J_USER", "neo4j")
-neo4j_password = os.environ.get("NEO4J_PASSWORD", "your_actual_password")  # Replace with your actual Neo4j password
+# Initialize Neo4j connection using config
+neo4j_uri = NEO4J_CONFIG["uri"]
+neo4j_user = NEO4J_CONFIG["user"]
+neo4j_password = NEO4J_CONFIG["password"]
 
 print(f"Connecting to Neo4j at {neo4j_uri} with user {neo4j_user}")
 try:
@@ -209,30 +206,75 @@ def get_graph():
         return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/api/query', methods=['POST'])
-def query_graph():
-    query_data = request.json
-    query_type = query_data.get('type', 'cypher')
-    query_text = query_data.get('query', '')
+def execute_query():
+    data = request.json
+    query_type = data.get('type', 'cypher')
+    query = data.get('query', '')
+    auth = data.get('auth', {})
+    
+    # Use provided credentials if available, otherwise use config
+    username = auth.get('username') or neo4j_user
+    password = auth.get('password') or neo4j_password
     
     try:
+        # Create a new connection with the provided credentials
+        conn = Neo4jConnection(neo4j_uri, username, password)
+        
         if query_type == 'cypher':
             # Execute Cypher query
-            results = neo4j_conn.query(query_text)
-            return jsonify({"results": [dict(record) for record in results]})
-        
+            result = conn.query(query)
+            
+            # Convert Neo4j objects to serializable format
+            serializable_result = []
+            for record in result:
+                record_dict = {}
+                for key, value in record.items():
+                    # Handle Neo4j Node objects
+                    if hasattr(value, 'labels') and hasattr(value, 'items'):  # It's a Node
+                        node_dict = dict(value.items())
+                        node_dict['_labels'] = list(value.labels)
+                        record_dict[key] = node_dict
+                    # Handle Neo4j Relationship objects
+                    elif hasattr(value, 'type') and hasattr(value, 'start_node'):  # It's a Relationship
+                        rel_dict = dict(value.items())
+                        rel_dict['_type'] = value.type
+                        rel_dict['_start_node_id'] = value.start_node.id
+                        rel_dict['_end_node_id'] = value.end_node.id
+                        record_dict[key] = rel_dict
+                    # Handle Neo4j Path objects
+                    elif hasattr(value, 'start_node') and hasattr(value, 'relationships'):  # It's a Path
+                        record_dict[key] = "Path object (serialized as string)"
+                    # Handle primitive types and collections
+                    elif isinstance(value, (str, int, float, bool, list, dict)) or value is None:
+                        record_dict[key] = value
+                    else:
+                        # For any other type, convert to string
+                        record_dict[key] = str(value)
+                serializable_result.append(record_dict)
+            
+            return jsonify({
+                "status": "success",
+                "results": serializable_result
+            })
         elif query_type == 'sparql':
-            # Convert SPARQL to Cypher or use RDF library
-            # This is a simplified placeholder
-            g = rdflib.Graph()
-            # Assume we've loaded our graph data into g
-            sparql_results = g.query(query_text)
-            return jsonify({"results": [dict(binding) for binding in sparql_results]})
-        
+            # Handle SPARQL queries (if implemented)
+            return jsonify({
+                "status": "error",
+                "message": "SPARQL queries are not yet implemented"
+            })
         else:
-            return jsonify({"status": "error", "message": f"Unsupported query type: {query_type}"})
-    
+            return jsonify({
+                "status": "error",
+                "message": f"Unsupported query type: {query_type}"
+            })
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 @app.route('/api/graph/update', methods=['POST'])
 def update_graph():

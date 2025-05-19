@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Tab, Tabs, Alert, ListGroup } from 'react-bootstrap';
 import axios from 'axios';
+import { API_CONFIG } from '../config';
 
 const SchemaManager = () => {
   const [schemas, setSchemas] = useState([]);
@@ -32,19 +33,27 @@ const SchemaManager = () => {
       // Validate JSON
       const schemaObj = JSON.parse(newSchema);
       
-      // TODO: Submit schema to API
-      // For now, just update local state
-      setSchemas([...schemas, { 
-        id: schemas.length + 1, 
-        name: schemaName, 
-        format: schemaObj['@context'] ? 'JSON-LD' : 'Custom' 
-      }]);
+      // Submit schema to API using config
+      const response = await axios.post(
+        `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.schema}`, 
+        schemaObj
+      );
       
-      setMessage({ type: 'success', text: 'Schema created successfully!' });
-      setNewSchema('');
-      setSchemaName('');
+      if (response.data.status === 'success') {
+        setSchemas([...schemas, { 
+          id: schemas.length + 1, 
+          name: schemaName, 
+          format: schemaObj['@context'] ? 'JSON-LD' : 'Custom' 
+        }]);
+        
+        setMessage({ type: 'success', text: 'Schema created successfully!' });
+        setNewSchema('');
+        setSchemaName('');
+      } else {
+        setMessage({ type: 'danger', text: response.data.message });
+      }
     } catch (error) {
-      setMessage({ type: 'danger', text: 'Invalid JSON format: ' + error.message });
+      setMessage({ type: 'danger', text: 'Invalid JSON format or API error: ' + error.message });
     }
   };
   

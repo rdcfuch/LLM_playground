@@ -1,6 +1,7 @@
 import React from 'react';
 import { Container, Tabs, Tab } from 'react-bootstrap';
 import TextFileImport from './TextFileImport';
+import JsonLdImport from './JsonLdImport';
 
 const DataImport = () => {
   return (
@@ -19,6 +20,10 @@ const DataImport = () => {
         
         <Tab eventKey="unstructured" title="Unstructured Text">
           <TextFileImport />
+        </Tab>
+        
+        <Tab eventKey="jsonld" title="JSON-LD">
+          <JsonLdImport />
         </Tab>
         
         <Tab eventKey="pdf" title="PDF Documents">

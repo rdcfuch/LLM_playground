@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_CONFIG } from '../config';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -12,14 +13,27 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // TODO: Fetch dashboard stats from API
-    // For now, using mock data
-    setStats({
-      schemas: 3,
-      nodes: 1250,
-      relationships: 3750,
-      lastUpdated: new Date().toLocaleString()
-    });
+    // Fetch dashboard stats from API
+    const fetchStats = async () => {
+      try {
+        // You would need to create this endpoint in the backend
+        const response = await axios.get(`${API_CONFIG.baseUrl}/stats`);
+        if (response.data) {
+          setStats(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        // Fallback to mock data
+        setStats({
+          schemas: 3,
+          nodes: 1250,
+          relationships: 3750,
+          lastUpdated: new Date().toLocaleString()
+        });
+      }
+    };
+    
+    fetchStats();
   }, []);
 
   return (
