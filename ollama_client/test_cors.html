@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ollama CORS Test</title>
+</head>
+<body>
+    <h1>Ollama CORS Test</h1>
+    <button onclick="testConnection()">Test Ollama Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:11434/api/tags', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<p style="color: green;">✅ SUCCESS: Connected to Ollama!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p style="color: red;">❌ HTTP Error: ${response.status}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">❌ CORS Error: ${error.message}</p>
+                <p><strong>Solution:</strong> Restart Ollama with CORS enabled:</p>
+                <code>OLLAMA_ORIGINS=* ollama serve</code>`;
+            }
+        }
+    </script>
+</body>
+</html>
