@@ -1,0 +1,11 @@
+llm_model: "OpenAI"  # Configurable LLM model (e.g., OpenAI, Ollama, LM Studio)
+mcp_server:
+  host: "localhost"  # MCP server host
+  port: 5000         # MCP server port
+  timeout: 30        # Timeout for MCP server requests
+logging:
+  level: "INFO"      # Logging level (e.g., DEBUG, INFO, WARNING, ERROR)
+  file: "logs/app.log"  # Log file path
+api:
+  version: "v1"      # API version
+  base_path: "/api"  # Base path for API endpoints

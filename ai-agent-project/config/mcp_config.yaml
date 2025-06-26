@@ -1,0 +1,13 @@
+mcp_server:
+  host: "localhost"
+  port: 5000
+  timeout: 30
+
+llm:
+  model: "openai"  # Options: openai, ollama, lmstudio
+  api_key: "your_api_key_here"
+  endpoint: "https://api.openai.com/v1/engines/davinci-codex/completions"
+
+logging:
+  level: "INFO"
+  file: "logs/mcp_server.log"
